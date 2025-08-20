@@ -1,3 +1,5 @@
-(torch-pip) lihubing@ThinkStation-P7:~/git-projects/cutlass$ pip install -e python
-Obtaining file:///home/lihubing/git-projects/cutlass/python
-ERROR: file:///home/lihubing/git-projects/cutlass/python does not appear to be a Python project: neither 'setup.py' nor 'pyproject.toml' found.
+(torch-pip) lihubing@ThinkStation-P7:~/git-projects/my-first-repo$ cd ~
+(torch-pip) lihubing@ThinkStation-P7:~$ pip install nvidia-cutlass-dsl
+ERROR: Ignored the following yanked versions: 0.0.0a0
+ERROR: Could not find a version that satisfies the requirement nvidia-cutlass-dsl (from versions: none)
+ERROR: No matching distribution found for nvidia-cutlass-dsl
