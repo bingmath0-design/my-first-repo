@@ -21,3 +21,15 @@ Call Stack (most recent call first):
 
 
 -- Configuring incomplete, errors occurred!
+(base) lihubing@ThinkStation-P7:~/git-projects/cutlass/build$ cmake .. -DCUTLASS_NVCC_ARCHS='86'
+-- CMake Version: 3.28.3
+-- CUTLASS 4.1.0
+CMake Error at /usr/share/cmake-3.28/Modules/Internal/CMakeCUDAArchitecturesValidate.cmake:7 (message):
+  CMAKE_CUDA_ARCHITECTURES must be non-empty if set.
+Call Stack (most recent call first):
+  /usr/share/cmake-3.28/Modules/CMakeDetermineCUDACompiler.cmake:116 (cmake_cuda_architectures_validate)
+  CUDA.cmake:40 (enable_language)
+  CMakeLists.txt:74 (include)
+
+
+-- Configuring incomplete, errors occurred!
