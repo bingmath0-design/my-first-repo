@@ -1,0 +1,23 @@
+(base) lihubing@ThinkStation-P7:~/git-projects/cutlass/build$ cmake .. -DCUTLASS_NVCC_ARCHS='86'
+-- CMake Version: 3.28.3
+-- CUTLASS 4.1.0
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- The CUDA compiler identification is unknown
+CMake Error at /usr/share/cmake-3.28/Modules/CMakeDetermineCUDACompiler.cmake:270 (message):
+  Failed to detect a default CUDA architecture.
+
+
+
+  Compiler output:
+
+Call Stack (most recent call first):
+  CUDA.cmake:40 (enable_language)
+  CMakeLists.txt:74 (include)
+
+
+-- Configuring incomplete, errors occurred!
