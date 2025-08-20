@@ -1,0 +1,6 @@
+Installing collected packages: typing-extensions, numpy, cuda-pathfinder, cuda-bindings, cuda-python, nvidia-cutlass-dsl
+Successfully installed cuda-bindings-12.9.2 cuda-pathfinder-1.1.0 cuda-python-12.9.2 numpy-2.3.2 nvidia-cutlass-dsl-4.1.0 typing-extensions-4.14.1
+(cutlass-dsl) lihubing@ThinkStation-P7:~/git-projects/my-first-repo$ python -c import cutlass; print(cutlass.__version__)
+Traceback (most recent call last):
+  File <string>, line 1, in <module>
+AttributeError: module 'cutlass' has no attribute '__version__'
