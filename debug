@@ -1,313 +1,883 @@
-// block_ldlt_utils.h
-#pragma once
-
-#include <cassert>
-#include <algorithm> // std::lower_bound
-#include <numeric>   // std::iota
-
-#include "types.h"
-#include "merge_arrays.h"
-#include "lapack_interface.h"
 #include "blas_interface.h"
-#include "block_factorization.h" // for MatrixXd, ReorderingData, CSR3Matrix, ArrayX, ArrayView
+#include "block_factorization.h"
+#include "lapack_interface.h"
+#include "merge_arrays.h"
+#include "types.h"
 
-namespace hplinalg {
-namespace detail {
+#include <algorithm> // std::lower_bound
+#include <cassert>   // assert
+#include <numeric>   // std::iota
+#include <type_traits>
+#include <utility>   // std::forward, std::declval
 
-    /// @brief Selects one of two types based on a boolean condition.
-    /// This is a small alias for std::conditional to keep template
-    /// code more readable.
-    template <bool B, class T, class F>
-    using conditional_t = typename std::conditional<B, T, F>::type;
+#define forward_solve 1
 
-    /// @brief A read-only view into selected columns of a matrix block.
-    ///
-    /// The matrix is stored as a MatrixRef, while the column indices
-    /// are stored as a view over an integer array.
-    struct InMatrixView
-    {
-        MatrixRef<const MatrixXd> block;   ///< n_rows x |indices|
-        ArrayView<const int_t>&   indices; ///< |indices| == block.cols()
+namespace hplinalg
+{
 
-        InMatrixView(MatrixRef<const MatrixXd> m, ArrayView<const int_t>& j)
-            : block(m)
-            , indices(j)
-        {}
-    };
+//======================================================================
+// 1. Factorization traits
+//
+//    All concrete types (blocks, index sets, reordering,
+//    value pointer) are described in a traits struct so that
+//    the factorization kernel only depends on a single traits interface.
+//======================================================================
 
-    /// @brief A writable view into selected columns of a matrix block.
-    ///
-    /// The matrix is stored as a reference, while the column indices
-    /// are stored as a mutable array.
-    struct OutMatrixView
-    {
-        MatrixXd&     block;   ///< n_rows x |indices|
-        ArrayX<int_t>& indices;///< |indices| == block.cols()
+using DefaultBlocks     = ArrayX<MatrixXd>;
+using DefaultIndexSets  = ArrayX<ArrayX<int_t>>;
+using DefaultReordering = ReorderingData;
+using DefaultValuePtr   = const double*;
 
-        OutMatrixView(MatrixXd& m, ArrayX<int_t>& j)
-            : block(m)
-            , indices(j)
-        {}
-    };
+// Generic primary template - left undefined on purpose.
+// Specializations will describe how to access the types and members.
+template <
+    typename BlocksT,
+    typename IndexSetsT,
+    typename ReorderingT,
+    typename ValuePtrT>
+struct factorization_traits;
 
-    /// @name View factory helpers
-    /// @{
+//------------------------------------------------------------------
+// Specialization for the current back-end:
+//   - Blocks are ArrayX<MatrixXd>
+//   - Index sets are ArrayX<ArrayX<int_t>>
+//   - ReorderingData is your existing struct
+//   - Values are provided via const double*
+//------------------------------------------------------------------
+template <>
+struct factorization_traits<
+    DefaultBlocks,
+    DefaultIndexSets,
+    DefaultReordering,
+    DefaultValuePtr>
+{
+    using blocks_type       = DefaultBlocks;
+    using index_sets_type   = DefaultIndexSets;
+    using reordering_type   = DefaultReordering;
+    using value_ptr_type    = DefaultValuePtr;
 
-    inline InMatrixView make_in_view(MatrixRef<const MatrixXd> M,
-                                     ArrayView<const int_t>& J)
-    {
-        return InMatrixView(M, J);
+    using block_type        = MatrixXd;
+    using index_type        = int_t;
+    using global_index_type = int_t;
+    using pattern_type      = CSR3Matrix<int_t>;
+    using index_array_type  = ArrayX<index_type>;
+    using index_view_type   = ArrayView<const index_type>;
+
+    // Deduce node container type and block-start-indices container type
+    // directly from ReorderingData, so if you change that struct later,
+    // the kernel code does not need to be touched.
+    using nodes_container_type =
+        decltype(std::declval<reordering_type>().dissectionData.nodes);
+
+    using block_start_indices_type =
+        decltype(std::declval<reordering_type>().dissectionData.blockStartIndices);
+
+    // Accessors for reordering components
+    static const pattern_type& pattern(const reordering_type& r) {
+        return r.reorderedPattern;
     }
 
-    inline InMatrixView make_in_view(MatrixXd& M,
-                                     ArrayView<const int_t>& J)
-    {
-        return InMatrixView(MatrixRef<const MatrixXd>(M), J);
+    static const nodes_container_type& get_nodes(const reordering_type& r) {
+        return r.dissectionData.nodes;
     }
 
-    inline InMatrixView make_in_view(MatrixRef<const MatrixXd> M,
-                                     const ArrayX<int_t>& J)
-    {
-        ArrayView<const int_t> JView(J.data(),
-                                     static_cast<index_t>(J.size()));
-        return InMatrixView(M, JView);
+    static const block_start_indices_type&
+    get_block_start_indices(const reordering_type& r) {
+        return r.dissectionData.blockStartIndices;
     }
 
-    inline OutMatrixView make_out_view(MatrixXd& M,
-                                       ArrayX<int_t>& J)
+    // Matrix helpers. If you change to a different matrix back-end,
+    // only these helper functions (and typedefs above) need to be updated.
+    static inline void set_zero(block_type& A,
+                                index_type rows,
+                                index_type cols)
     {
-        return OutMatrixView(M, J);
+        A.setZero(rows, cols);
     }
 
-    /// @}
-
-    /// @brief Extend an assembled block by adding contributions from
-    ///        multiple child blocks.
-    ///
-    /// Given several blocks that share some subset of column indices,
-    /// this routine:
-    ///   1. Builds the union of all column index sets,
-    ///   2. Resizes the assembled block accordingly,
-    ///   3. Accumulates all contributions into the assembled block.
-    ///
-    /// Overlapping columns are summed, which is the behavior expected
-    /// when combining multiple update blocks along the elimination tree.
-    ///
-    /// @param assembled      [in/out] Current assembled view: block + cols.
-    /// @param childContribs  [in]     Array of child contributions.
-    static inline void extend_add_col(OutMatrixView assembled,
-                                      ArrayX<InMatrixView>& childContribs)
+    static inline block_type make_zero(index_type rows,
+                                       index_type cols)
     {
-        auto& assembledCols  = assembled.indices;
-        auto& assembledBlock = assembled.block;
+        block_type A;
+        A.setZero(rows, cols);
+        return A;
+    }
 
-        // Make local copies of the original assembled content. These
-        // form the first "part" in the union.
-        MatrixXd       assembledBlock0(assembledBlock);
-        ArrayX<int_t>  assembledCols0(assembledCols);
+    // Helper type aliases for Eigen-style views.
+    // Using decltype(std::declval<block_type&>().leftCols(0)) avoids the need
+    // for C++14 return-type deduction with `auto` and keeps this C++11-friendly.
+    using left_cols_return_type =
+        decltype(std::declval<block_type&>().leftCols(0));
+    using right_cols_return_type =
+        decltype(std::declval<block_type&>().rightCols(0));
+    using top_rows_return_type =
+        decltype(std::declval<block_type&>().topRows(0));
 
-        const int_t nPartInput =
-            static_cast<int_t>(childContribs.size()) + 1;
+    static inline left_cols_return_type
+    left_cols(block_type& A, index_type n) {
+        return A.leftCols(n);
+    }
 
-        ArrayX<ArrayView<const int_t>> partColViews; ///< column sets
-        ArrayX<MatrixRef<MatrixXd>>    partBlocks;   ///< block views
+    static inline right_cols_return_type
+    right_cols(block_type& A, index_type n) {
+        return A.rightCols(n);
+    }
 
-        partColViews.reserve(nPartInput);
-        partBlocks.reserve(nPartInput);
+    static inline top_rows_return_type
+    top_rows(block_type& A, index_type n) {
+        return A.topRows(n);
+    }
 
-        int_t nRow = 0;
+    static inline index_type rows(const block_type& A) {
+        return static_cast<index_type>(A.rows());
+    }
 
-        // Original assembled block as the first part
-        if (assembledBlock0.rows() > 0 && assembledBlock0.cols() > 0)
+    static inline index_type cols(const block_type& A) {
+        return static_cast<index_type>(A.cols());
+    }
+};
+
+
+//======================================================================
+// 2. Numeric back-end wrappers (LAPACK/BLAS) with parameter packs
+//======================================================================
+
+namespace detail
+{
+
+// Generic numerics caller with perfect forwarding.
+// All BLAS/LAPACK style functions go through this wrapper.
+template <typename F, typename... Args>
+inline auto call_numerics(F&& f, Args&&... args)
+    -> decltype(std::forward<F>(f)(std::forward<Args>(args)...))
+{
+    return std::forward<F>(f)(std::forward<Args>(args)...);
+}
+
+// Wrapped Cholesky / LDLT factorization
+template <typename BlockT>
+inline void factorize_pivot(BlockT& Rii) {
+    call_numerics(lapack_dpotrf, Rii);
+}
+
+// Wrapped triangular solve using the factorized pivot
+template <typename UiBlock, typename RBlock>
+inline void solve_pivot(UiBlock& Ui, const RBlock& Rii) {
+    call_numerics(lapack_dpotrs, Ui, Rii);
+}
+
+// Wrapped symmetric rank-k like update (upper-triangular)
+template <typename C, typename A, typename B, typename Alpha, typename Beta>
+inline void symmetric_update(C& Cblk, Alpha alpha,
+                             const A& Ablk, const B& Bblk, Beta beta)
+{
+    call_numerics(blasx_gemmt, Cblk, alpha, Ablk, Bblk, beta);
+}
+
+
+//======================================================================
+// 3. Core factorization kernel
+//
+//    This struct is parameterized only by a traits type. All concrete
+//    types (matrix blocks, index sets, reordering data, etc.) are
+//    encapsulated inside the traits specialization to avoid code duplication.
+//======================================================================
+
+template <typename Traits>
+struct FactorizationKernel
+{
+    using blocks_type       = typename Traits::blocks_type;
+    using index_sets_type   = typename Traits::index_sets_type;
+    using reordering_type   = typename Traits::reordering_type;
+    using value_ptr_type    = typename Traits::value_ptr_type;
+
+    using block_type        = typename Traits::block_type;
+    using index_type        = typename Traits::index_type;
+    using global_index_type = typename Traits::global_index_type;
+    using pattern_type      = typename Traits::pattern_type;
+    using index_array_type  = typename Traits::index_array_type;
+    using index_view_type   = typename Traits::index_view_type;
+
+    // Main entry point
+    static void run(blocks_type&       DBlocks,
+                    blocks_type&       UBlocks,
+                    blocks_type&       SBlocks,
+                    index_sets_type&   nnzIndSets,
+                    const reordering_type& reorderingData,
+                    value_ptr_type     vals)
+    {
+        static_assert(std::is_pointer<value_ptr_type>::value,
+                      "value_ptr_type is expected to be a pointer.");
+
+        const auto& pattern           = Traits::pattern(reorderingData);
+        const auto& reorderedPtrs     = pattern.ptrs;
+        const auto& reorderedInds     = pattern.inds;
+        const auto& reorderedVals     = pattern.vals;
+        const auto& nodes             = Traits::get_nodes(reorderingData);
+        const auto& blockStartIndices = Traits::get_block_start_indices(reorderingData);
+
+        const index_type nNodes = static_cast<index_type>(nodes.size());
+
+        for (index_type i = 0; i < nNodes; ++i)
         {
-            partColViews.push_back(
-                ArrayView<const int_t>(
-                    assembledCols0.data(),
-                    static_cast<index_t>(assembledCols0.size())));
+            const auto& node     = nodes[i];
+            const index_type rowBegin = blockStartIndices[i];
+            const index_type rowEnd   = blockStartIndices[i + 1];
 
-            partBlocks.push_back(MatrixRef<MatrixXd>(assembledBlock0));
-            nRow = static_cast<int_t>(assembledBlock0.rows());
-        }
+            // References to factorization data for current node
+            auto& Rii           = DBlocks[i];
+            auto& Ui            = UBlocks[i];
+            auto& updateBlock   = SBlocks[i];
+            auto& updateIndices = nnzIndSets[i];
 
-        // Add each child contribution as a separate part
-        for (const auto& part : childContribs)
-        {
-            const auto& partBlock = part.block;
-            const auto& partCols  = part.indices;
-            if (partBlock.rows() == 0 || partBlock.cols() == 0)
-                continue; // skip empty parts
+            if (node.isLeaf())
+            {
+                factorize_leaf_node(
+                    Rii, Ui, updateBlock, updateIndices,
+                    rowBegin, rowEnd,
+                    reorderedPtrs, reorderedInds, reorderedVals,
+                    vals);
+            }
+            else if (!node.isRoot())
+            {
+                // Non-root internal node: its two children contribute updates.
+                index_array_type childIds{ node.left->data, node.right->data };
 
-            partColViews.push_back(partCols);
-            partBlocks.push_back(partBlock);
-
-            if (nRow == 0)
-                nRow = static_cast<int_t>(partBlock.rows());
+                factorize_internal_node(
+                    Rii, Ui, updateBlock, updateIndices,
+                    rowBegin, rowEnd,
+                    DBlocks, UBlocks, SBlocks, nnzIndSets,
+                    childIds,
+                    reorderedPtrs, reorderedInds, reorderedVals,
+                    vals);
+            }
             else
-                assert(nRow == static_cast<int_t>(partBlock.rows()));
-        }
-
-        const index_t nPart = static_cast<index_t>(partBlocks.size());
-        if (nPart == 0)
-            return; // nothing to do
-
-        if (nPart == 1)
-        {
-            // Only one non-empty part, directly copy
-            assembledCols.assign(partColViews[0].begin(), partColViews[0].end());
-            assembledBlock = partBlocks[0];
-            return;
-        }
-
-        // Build union of column indices across all parts
-        UnionInfo unionInfo;
-        build_union_from_sorted_arrays_with_maps(unionInfo, partColViews);
-
-        auto&       unionCols = unionInfo.data;      // unique column indices
-        const auto& indexMaps = unionInfo.indexMaps; // index maps for each part
-
-        assembledCols.swap(unionCols);
-
-        assert(indexMaps.size() == nPart);
-        for (index_t p = 0; p < nPart; ++p)
-        {
-            assert(indexMaps[p].size() ==
-                   static_cast<index_t>(partBlocks[p].cols()));
-        }
-
-        // Resize result block
-        const int_t nCol =
-            static_cast<int_t>(assembledCols.size());
-        assembledBlock.setZero(nRow, nCol); // initialize to zero
-
-        // Accumulate parts into the assembled block
-        for (index_t p = 0; p < nPart; ++p)
-        {
-            const auto  partBlock = partBlocks[p];
-            const auto& indexMap  = indexMaps[p];
-            const index_t nPartCol =
-                static_cast<index_t>(partBlock.cols());
-
-            for (index_t partCol = 0; partCol < nPartCol; ++partCol)
             {
-                const int_t assembledCol = indexMap[partCol];
-                assembledBlock.col(assembledCol) +=
-                    partBlock.col(static_cast<int_t>(partCol));
+                // Root node: also has children, but no parent to send updates to.
+                index_array_type childIds{ node.left->data, node.right->data };
+
+                factorize_root_node(
+                    Rii, updateIndices,
+                    rowBegin, rowEnd,
+                    SBlocks, nnzIndSets, childIds,
+                    reorderedPtrs, reorderedInds, reorderedVals,
+                    vals);
             }
         }
     }
 
-    /// @brief Extract the arrowhead block for a given node in the elimination tree.
-    ///
-    /// The arrowhead block consists of:
-    ///   - a pivot part (diagonal block),
-    ///   - an off-diagonal update part.
-    ///
-    /// Both parts are assembled using the reordered sparsity pattern
-    /// and the original matrix values.
-    ///
-    /// @param[out] arrowhead      Assembled arrowhead block.
-    /// @param[out] arrowheadCols  Column indices of the arrowhead block.
-    /// @param[in]  rowBeginNode   First row of this node in the reordered matrix.
-    /// @param[in]  rowEndNode     One-past-last row of this node in the reordered matrix.
-    /// @param[in]  reorderedPattern Reordered CSR3 pattern.
-    /// @param[in]  vals           Pointer to original matrix values.
-    static inline void get_arrowhead_block(MatrixXd&              arrowhead,
-                                           ArrayX<int_t>&         arrowheadCols,
-                                           const int_t            rowBeginNode,
-                                           const int_t            rowEndNode,
-                                           const CSR3Matrix<int_t>& reorderedPattern,
-                                           const double*          vals)
+private:
+    //------------------------------------------------------------------
+    // Helper: build off-diagonal views for each row of a node.
+    //
+    // We do not require any specific container for ptrs/inds; as long as
+    // operator[] works and the data is contiguous, this function works.
+    //------------------------------------------------------------------
+    template <typename PtrArray, typename IndArray>
+    static void build_offdiag_views(
+        const PtrArray&          ptrs,
+        const IndArray&          inds,
+        index_type               rowBegin,
+        index_type               rowEnd,
+        ArrayX<index_view_type>& offdiagColViewsPerRow,
+        ArrayX<index_type>&      offdiagOffsetsPerRow)
     {
-        const auto& reorderedPtrs = reorderedPattern.ptrs;
-        const auto& reorderedInds = reorderedPattern.inds;
-        const auto& reorderedVals = reorderedPattern.vals;
+        const index_type offdiagCutoffCol = rowEnd;
+        const index_type nRow = rowEnd - rowBegin;
 
-        const int_t nRow          = rowEndNode - rowBeginNode;
-        const int_t updateCutoff  = rowEndNode;
-
-        // Collect off-diagonal column indices for each row
-        ArrayX<ArrayView<const int_t>> updateColViews(nRow);
-        ArrayX<int_t>                  updateColOffset(nRow);
-
-        for (int_t r = rowBeginNode; r < rowEndNode; ++r)
+        for (index_type r = rowBegin; r < rowEnd; ++r)
         {
-            const int_t localRow = r - rowBeginNode;
-            const int_t rowBegin = reorderedPtrs[r];
-            const int_t rowEnd   = reorderedPtrs[r + 1];
+            const index_type k           = r - rowBegin;
+            const index_type rowNnzBegin = ptrs[r];
+            const index_type rowNnzEnd   = ptrs[r + 1];
 
-            const int_t* rowColBegin = &reorderedInds[rowBegin];
-            const int_t* rowColEnd   = &reorderedInds[rowEnd];
+            const index_type* rowColBegin = &inds[rowNnzBegin];
+            const index_type* rowColEnd   = &inds[rowNnzEnd];
 
-            // Locate the first column index >= updateCutoff
-            auto updateBegin =
-                std::lower_bound(rowColBegin, rowColEnd, updateCutoff);
+            // Sanity checks: row pattern should be sorted
+            assert(rowNnzEnd >= rowNnzBegin);
+            assert(std::is_sorted(rowColBegin, rowColEnd));
 
-            const index_t updateCount =
-                static_cast<index_t>(rowColEnd - updateBegin);
+            // First column index >= offdiagCutoffCol
+            auto offdiagColBegin =
+                std::lower_bound(rowColBegin, rowColEnd, offdiagCutoffCol);
+            index_t offdiagColCount =
+                static_cast<index_t>(rowColEnd - offdiagColBegin);
 
-            // Offset relative to rowBegin, used when reading vals
-            updateColOffset[localRow] =
-                static_cast<int_t>(updateBegin - rowColBegin);
-
-            updateColViews[localRow] =
-                ArrayView<const int_t>(updateBegin, updateCount);
+            offdiagOffsetsPerRow[k] =
+                static_cast<index_type>(offdiagColBegin - rowColBegin);
+            offdiagColViewsPerRow[k] =
+                index_view_type(offdiagColBegin, offdiagColCount);
         }
 
-        // Build union of update column indices across all rows
-        UnionInfo unionInfo;
-        build_union_from_sorted_arrays_with_maps(unionInfo, updateColViews);
+        (void)nRow; // avoid unused warning on some compilers
+    }
 
-        const auto& updateCols = unionInfo.data;
-        const auto& indexMaps  = unionInfo.indexMaps;
+    //------------------------------------------------------------------
+    // Leaf node factorization: assemble front block Aii/Aij, factorize
+    // Aii, then compute Schur complement update to be sent to parent.
+    //------------------------------------------------------------------
+    template <typename PtrArray, typename IndArray, typename ValIndexArray>
+    static void factorize_leaf_node(
+        block_type&           Rii,
+        block_type&           Ui,
+        block_type&           updateBlock,
+        index_array_type&     updateIndices,
+        index_type            rowBegin,
+        index_type            rowEnd,
+        const PtrArray&       reorderedPtrs,
+        const IndArray&       reorderedInds,
+        const ValIndexArray&  reorderedVals,
+        value_ptr_type        vals)
+    {
+        const index_type nRow = rowEnd - rowBegin;
 
-        const int_t nUpdateCol =
-            static_cast<int_t>(updateCols.size());
-        const int_t nCol = nRow + nUpdateCol;
+        ArrayX<index_view_type> offdiagColViewsPerRow(nRow);
+        ArrayX<index_type>      offdiagOffsetsPerRow(nRow);
 
-        // Arrowhead column indices = diagonal rows + off-diagonal columns
-        arrowheadCols.resize(nCol);
-        std::iota(arrowheadCols.begin(),
-                  arrowheadCols.begin() + nRow,
-                  rowBeginNode);
-        std::copy(updateCols.begin(), updateCols.end(),
-                  arrowheadCols.begin() + nRow);
+        build_offdiag_views(
+            reorderedPtrs, reorderedInds,
+            rowBegin, rowEnd,
+            offdiagColViewsPerRow,
+            offdiagOffsetsPerRow);
 
-        // Assemble the arrowhead block
-        arrowhead.setZero(nRow, nCol);
-        MatrixRef<MatrixXd> pivot  = arrowhead.leftCols(nRow);
-        MatrixRef<MatrixXd> update = arrowhead.rightCols(nUpdateCol);
+        index_array_type         offdiagIndices;
+        ArrayX<index_array_type> indexMaps;
+        build_union_from_sorted_arrays_with_maps(
+            offdiagIndices, indexMaps, offdiagColViewsPerRow);
 
-        // Fill pivot and update parts
-        for (int_t r = rowBeginNode; r < rowEndNode; ++r)
+        const index_type nOffdiagIndex =
+            static_cast<index_type>(offdiagIndices.size());
+        const index_type nCol = nRow + nOffdiagIndex;
+
+        // Column indices of the assembled front block
+        index_array_type frontIndices;
+        frontIndices.resize(nCol);
+        std::iota(frontIndices.begin(), frontIndices.begin() + nRow, rowBegin);
+        std::copy(offdiagIndices.begin(), offdiagIndices.end(),
+                  frontIndices.begin() + nRow);
+
+        // Assemble front block [Aii | Aij]
+        block_type frontBlock = Traits::make_zero(nRow, nCol);
+
+        auto Aii = Traits::left_cols(frontBlock, nRow);
+        auto Aij = Traits::right_cols(frontBlock, nOffdiagIndex);
+
+        for (index_type r = rowBegin; r < rowEnd; ++r)
         {
-            const int_t localRow = r - rowBeginNode;
-            const int_t rowBegin = reorderedPtrs[r];
-            const int_t rowEnd   = reorderedPtrs[r + 1];
-            const int_t offDiagBegin =
-                rowBegin + updateColOffset[localRow];
+            const index_type k           = r - rowBegin;
+            const index_type rowNnzBegin = reorderedPtrs[r];
+            const index_type rowNnzEnd   = reorderedPtrs[r + 1];
+            const index_type offdiagBegin =
+                rowNnzBegin + offdiagOffsetsPerRow[k];
 
-            // Diagonal block (pivot part)
-            for (int_t rs = rowBegin; rs < offDiagBegin; ++rs)
+            // Diagonal part: Aii
+            for (index_type rs = rowNnzBegin; rs < offdiagBegin; ++rs)
             {
-                const int_t s = reorderedInds[rs];
-                assert(s >= rowBeginNode && s < rowEndNode);
+                const index_type s = reorderedInds[rs];
+                assert(s >= rowBegin && s < rowEnd);
 
-                const int_t localCol = s - rowBeginNode;
-                pivot(localRow, localCol) = vals[reorderedVals[rs]];
+                const index_type l = s - rowBegin;
+                Aii(k, l) = vals[reorderedVals[rs]];
             }
 
-            // Off-diagonal part (update block)
-            const auto& indexMap = indexMaps[localRow];
-            for (int_t kLocal = 0;
-                 kLocal < static_cast<int_t>(indexMap.size());
+            // Off-diagonal part: Aij
+            const auto& indexMap = indexMaps[k];
+            for (index_type kLocal = 0;
+                 kLocal < static_cast<index_type>(indexMap.size());
                  ++kLocal)
             {
-                const int_t rs       = offDiagBegin + kLocal;
-                const int_t localCol = indexMap[kLocal];
-                update(localRow, localCol) = vals[reorderedVals[rs]];
+                const index_type rs = offdiagBegin + kLocal;
+                const index_type l  = indexMap[kLocal];
+                Aij(k, l) = vals[reorderedVals[rs]];
+            }
+        }
+
+        // Factorize pivot block and form Schur complement update.
+        const index_type blockSize    = Traits::rows(frontBlock);
+        const index_type nFrontIndex  =
+            static_cast<index_type>(frontIndices.size());
+        const index_type nUpdateIndex = nFrontIndex - blockSize;
+
+        assert(nFrontIndex == Traits::cols(frontBlock));
+        assert(nUpdateIndex >= 0);
+
+        updateIndices.clear();
+
+        // Factorize Aii
+        Rii = Aii;
+        factorize_pivot(Rii);
+
+        // Solve Aii * Ui = Aij  => Ui = Aii^{-1} Aij
+        Ui = Aij;
+        solve_pivot(Ui, Rii);
+
+        // Schur complement: S = - Aij^T Aii^{-1} Aij
+        updateBlock.resize(nUpdateIndex, nUpdateIndex);
+        symmetric_update(updateBlock, -1.0, Ui, Aij, 0.0);
+
+        // The update indices are the off-diagonal columns of the front
+        updateIndices.assign(frontIndices.begin() + blockSize,
+                             frontIndices.end());
+
+        // For leaf nodes, we do not keep Ui; it will be recomputed later if needed.
+        release_matrix(Ui);
+    }
+
+    //------------------------------------------------------------------
+    // Internal (non-root) node factorization:
+    //  - assemble arrowhead block from current node
+    //  - merge children updates and current arrowhead into a front block
+    //  - factorize front pivot
+    //  - build Schur complement update and accumulate children updates
+    //------------------------------------------------------------------
+    template <
+        typename PtrArray,
+        typename IndArray,
+        typename ValIndexArray>
+    static void factorize_internal_node(
+        block_type&           Rii,
+        block_type&           Ui,
+        block_type&           updateBlock,
+        index_array_type&     updateIndices,
+        index_type            rowBegin,
+        index_type            rowEnd,
+        blocks_type&          DBlocks,     // currently unused, kept for interface compatibility
+        blocks_type&          UBlocks,     // currently unused
+        blocks_type&          SBlocks,
+        index_sets_type&      nnzIndSets,
+        const index_array_type& childIds,  // children of this node
+        const PtrArray&       reorderedPtrs,
+        const IndArray&       reorderedInds,
+        const ValIndexArray&  reorderedVals,
+        value_ptr_type        vals)
+    {
+        const index_type nRow = rowEnd - rowBegin;
+
+        ArrayX<index_view_type> offdiagColViewsPerRow(nRow);
+        ArrayX<index_type>      offdiagOffsetsPerRow(nRow);
+
+        build_offdiag_views(
+            reorderedPtrs, reorderedInds,
+            rowBegin, rowEnd,
+            offdiagColViewsPerRow,
+            offdiagOffsetsPerRow);
+
+        index_array_type         offdiagIndices;
+        ArrayX<index_array_type> indexMaps;
+        build_union_from_sorted_arrays_with_maps(
+            offdiagIndices, indexMaps, offdiagColViewsPerRow);
+
+        const index_type nOffdiagIndex =
+            static_cast<index_type>(offdiagIndices.size());
+        const index_type nCol = nRow + nOffdiagIndex;
+
+        // Column indices of arrowhead block = diagonal indices + offdiag indices
+        index_array_type arrowheadIndices;
+        arrowheadIndices.resize(nCol);
+        std::iota(arrowheadIndices.begin(), arrowheadIndices.begin() + nRow,
+                  rowBegin);
+        std::copy(offdiagIndices.begin(), offdiagIndices.end(),
+                  arrowheadIndices.begin() + nRow);
+
+        // Arrowhead block [pivotPart | offdiagPart]
+        block_type arrowheadBlock = Traits::make_zero(nRow, nCol);
+
+        auto pivotPart   = Traits::left_cols(arrowheadBlock, nRow);
+        auto offdiagPart = Traits::right_cols(arrowheadBlock, nOffdiagIndex);
+
+        // Fill arrowhead block
+        for (index_type r = rowBegin; r < rowEnd; ++r)
+        {
+            const index_type k            = r - rowBegin;
+            const index_type rowNnzBegin  = reorderedPtrs[r];
+            const index_type rowNnzEnd    = reorderedPtrs[r + 1];
+            const index_type offdiagBegin =
+                rowNnzBegin + offdiagOffsetsPerRow[k];
+
+            // Diagonal
+            for (index_type rs = rowNnzBegin; rs < offdiagBegin; ++rs)
+            {
+                const index_type s = reorderedInds[rs];
+                assert(s >= rowBegin && s < rowEnd);
+
+                const index_type l = s - rowBegin;
+                pivotPart(k, l) = vals[reorderedVals[rs]];
+            }
+
+            // Off-diagonal
+            const auto& indexMap = indexMaps[k];
+            for (index_type kLocal = 0;
+                 kLocal < static_cast<index_type>(indexMap.size());
+                 ++kLocal)
+            {
+                const index_type rs = offdiagBegin + kLocal;
+                const index_type l  = indexMap[kLocal];
+                offdiagPart(k, l) = vals[reorderedVals[rs]];
+            }
+        }
+
+        // Contributions from children and the current node
+        ArrayX<block_type>  contribBlocks;    // contributions from children + self
+        ArrayX<index_view_type> contribIndexViews;
+        ArrayX<index_type>      pivotWidths;  // pivot widths for each contribution
+
+        contribBlocks.resize(3);
+        contribIndexViews.resize(3);
+        pivotWidths.resize(3);
+
+        // Collect contributions from children
+        for (index_type c = 0; c < 2; ++c)
+        {
+            const index_type childId = childIds[c];
+            contribBlocks[c].swap(SBlocks[childId]);
+            contribIndexViews[c] = make_array_view(nnzIndSets[childId]);
+
+            const auto& contribCol = contribIndexViews[c];
+            auto it = std::lower_bound(contribCol.cbegin(), contribCol.cend(), rowEnd);
+            pivotWidths[c] = static_cast<index_type>(it - contribCol.cbegin());
+        }
+
+        // Contribution from current node
+        pivotWidths[2] = rowEnd - rowBegin;
+        contribBlocks[2].swap(arrowheadBlock);
+        contribIndexViews[2] = make_array_view(arrowheadIndices);
+
+        // Merge all contribution columns to form frontIndices
+        index_array_type         frontIndices;
+        ArrayX<index_array_type> contribToFrontMaps;
+        contribToFrontMaps.resize(3);
+
+        build_union_from_sorted_arrays_with_maps(
+            frontIndices, contribToFrontMaps, contribIndexViews);
+
+        const index_type nFrontRow   = rowEnd - rowBegin;
+        const index_type nFrontIndex =
+            static_cast<index_type>(frontIndices.size());
+
+        block_type frontBlock;
+        Traits::set_zero(frontBlock, nFrontRow, nFrontIndex);
+
+        assert(contribToFrontMaps.size() == 3);
+        assert(contribBlocks.size()     == 3);
+        assert(pivotWidths.size()       == 3);
+        assert(Traits::rows(frontBlock) == pivotWidths.back());
+
+        // Accumulate contributions into front block
+        for (index_type c = 0; c < 3; ++c)
+        {
+            const auto& contribToFront = contribToFrontMaps[c];
+            const index_type pivotWidth = pivotWidths[c];
+            const auto contribBlock = Traits::top_rows(contribBlocks[c], pivotWidth);
+
+            assert(static_cast<index_type>(contribToFront.size())
+                   == Traits::cols(contribBlock));
+
+            // Diagonal (pivot) part - upper triangular
+            for (index_type contribCol = 0; contribCol < pivotWidth; ++contribCol)
+            {
+                const index_type frontCol = contribToFront[contribCol];
+                for (index_type contribRow = 0;
+                     contribRow <= contribCol;
+                     ++contribRow)
+                {
+                    frontBlock(contribRow, frontCol) +=
+                        contribBlock(contribRow, contribCol);
+                }
+            }
+
+            // Off-diagonal part
+            for (index_type contribCol = pivotWidth;
+                 contribCol < static_cast<index_type>(contribToFront.size());
+                 ++contribCol)
+            {
+                const index_type frontCol = contribToFront[contribCol];
+                for (index_type contribRow = 0;
+                     contribRow < pivotWidth;
+                     ++contribRow)
+                {
+                    frontBlock(contribRow, frontCol) +=
+                        contribBlock(contribRow, contribCol);
+                }
+            }
+        }
+
+        // Factorize front block and build update to parent
+        const index_type blockSize    = Traits::rows(frontBlock);
+        const index_type nUpdateIndex = nFrontIndex - blockSize;
+
+        assert(nFrontIndex == Traits::cols(frontBlock));
+        assert(nUpdateIndex >= 0);
+
+        updateIndices.clear();
+
+        auto Aii = Traits::left_cols(frontBlock, blockSize);
+        auto Aij = Traits::right_cols(frontBlock, nUpdateIndex);
+
+        Rii = Aii;
+        Ui  = Aij;
+
+        factorize_pivot(Rii);
+        solve_pivot(Ui, Rii);
+
+        updateBlock.resize(nUpdateIndex, nUpdateIndex);
+        symmetric_update(updateBlock, -1.0, Ui, Aij, 0.0);
+
+        updateIndices.assign(frontIndices.begin() + blockSize,
+                             frontIndices.end());
+
+        // Accumulate updates from children into the update block of parent
+        for (index_type c = 0; c < 2; ++c) // only children contribute
+        {
+            const auto& updateChild  = contribBlocks[c];
+            const auto& childToFront = contribToFrontMaps[c];
+            const index_type pivotWidth = pivotWidths[c];
+
+            const index_type nChildCol  =
+                static_cast<index_type>(childToFront.size());
+            const index_type nUpdateCol = nChildCol - pivotWidth;
+
+            if (nUpdateCol == 0)
+                continue;
+
+            for (index_type childCol = pivotWidth;
+                 childCol < nChildCol;
+                 ++childCol)
+            {
+                const index_type updateCol =
+                    childToFront[childCol] - blockSize;
+
+                for (index_type childRow = pivotWidth;
+                     childRow <= childCol;
+                     ++childRow)
+                {
+                    const index_type updateRow =
+                        childToFront[childRow] - blockSize;
+
+                    updateBlock(updateRow, updateCol) +=
+                        updateChild(childRow, childCol);
+                }
             }
         }
     }
 
+    //------------------------------------------------------------------
+    // Root node factorization:
+    //  - assemble arrowhead block + children contributions
+    //  - form the final front and factorize
+    //  - no further updates (root has no parent)
+    //------------------------------------------------------------------
+    template <
+        typename PtrArray,
+        typename IndArray,
+        typename ValIndexArray>
+    static void factorize_root_node(
+        block_type&           Rii,
+        index_array_type&     updateIndices,
+        index_type            rowBegin,
+        index_type            rowEnd,
+        blocks_type&          SBlocks,
+        index_sets_type&      nnzIndSets,
+        const index_array_type& childIds,  // children of root
+        const PtrArray&       reorderedPtrs,
+        const IndArray&       reorderedInds,
+        const ValIndexArray&  reorderedVals,
+        value_ptr_type        vals)
+    {
+        const index_type nRow = rowEnd - rowBegin;
+
+        ArrayX<index_view_type> offdiagColViewsPerRow(nRow);
+        ArrayX<index_type>      offdiagOffsetsPerRow(nRow);
+
+        build_offdiag_views(
+            reorderedPtrs, reorderedInds,
+            rowBegin, rowEnd,
+            offdiagColViewsPerRow,
+            offdiagOffsetsPerRow);
+
+        index_array_type         offdiagIndices;
+        ArrayX<index_array_type> indexMaps;
+        build_union_from_sorted_arrays_with_maps(
+            offdiagIndices, indexMaps, offdiagColViewsPerRow);
+
+        const index_type nOffdiagIndex =
+            static_cast<index_type>(offdiagIndices.size());
+        const index_type nCol = nRow + nOffdiagIndex;
+
+        index_array_type arrowheadIndices;
+        arrowheadIndices.resize(nCol);
+        std::iota(arrowheadIndices.begin(), arrowheadIndices.begin() + nRow,
+                  rowBegin);
+        std::copy(offdiagIndices.begin(), offdiagIndices.end(),
+                  arrowheadIndices.begin() + nRow);
+
+        block_type arrowheadBlock;
+        Traits::set_zero(arrowheadBlock, nRow, nCol);
+
+        auto pivotPart   = Traits::left_cols(arrowheadBlock, nRow);
+        auto offdiagPart = Traits::right_cols(arrowheadBlock, nOffdiagIndex);
+
+        // Fill arrowhead block from matrix entries
+        for (index_type r = rowBegin; r < rowEnd; ++r)
+        {
+            const index_type k            = r - rowBegin;
+            const index_type rowNnzBegin  = reorderedPtrs[r];
+            const index_type rowNnzEnd    = reorderedPtrs[r + 1];
+            const index_type offdiagBegin =
+                rowNnzBegin + offdiagOffsetsPerRow[k];
+
+            // Diagonal part
+            for (index_type rs = rowNnzBegin; rs < offdiagBegin; ++rs)
+            {
+                const index_type s = reorderedInds[rs];
+                assert(s >= rowBegin && s < rowEnd);
+
+                const index_type l = s - rowBegin;
+                pivotPart(k, l) = vals[reorderedVals[rs]];
+            }
+
+            // Off-diagonal part
+            const auto& indexMap = indexMaps[k];
+            for (index_type kLocal = 0;
+                 kLocal < static_cast<index_type>(indexMap.size());
+                 ++kLocal)
+            {
+                const index_type rs = offdiagBegin + kLocal;
+                const index_type l  = indexMap[kLocal];
+                offdiagPart(k, l) = vals[reorderedVals[rs]];
+            }
+        }
+
+        ArrayX<block_type>  contribBlocks;
+        ArrayX<index_view_type> contribIndexViews;
+        ArrayX<index_type>      pivotWidths;
+
+        contribBlocks.resize(3);
+        contribIndexViews.resize(3);
+        pivotWidths.resize(3);
+
+        // Children contributions
+        for (index_type c = 0; c < 2; ++c)
+        {
+            const index_type childId = childIds[c];
+            contribBlocks[c].swap(SBlocks[childId]);
+            contribIndexViews[c] = make_array_view(nnzIndSets[childId]);
+
+            const auto& contribCol = contribIndexViews[c];
+            auto it = std::lower_bound(contribCol.cbegin(), contribCol.cend(),
+                                       rowEnd);
+            pivotWidths[c] = static_cast<index_type>(it - contribCol.cbegin());
+        }
+
+        // Current node contribution
+        pivotWidths[2] = rowEnd - rowBegin;
+        contribBlocks[2].swap(arrowheadBlock);
+        contribIndexViews[2] = make_array_view(arrowheadIndices);
+
+        index_array_type         frontIndices;
+        ArrayX<index_array_type> contribToFrontMaps;
+        contribToFrontMaps.resize(3);
+
+        build_union_from_sorted_arrays_with_maps(
+            frontIndices, contribToFrontMaps, contribIndexViews);
+
+        const index_type nFrontRow   = rowEnd - rowBegin;
+        const index_type nFrontIndex =
+            static_cast<index_type>(frontIndices.size());
+
+        block_type frontBlock;
+        Traits::set_zero(frontBlock, nFrontRow, nFrontIndex);
+
+        assert(contribToFrontMaps.size() == 3);
+        assert(contribBlocks.size()     == 3);
+        assert(pivotWidths.size()       == 3);
+        assert(Traits::rows(frontBlock) == pivotWidths.back());
+
+        // Accumulate contributions into final front block (root front)
+        for (index_type c = 0; c < 3; ++c)
+        {
+            const auto& contribToFront = contribToFrontMaps[c];
+            const index_type pivotWidth = pivotWidths[c];
+            const auto contribBlock = Traits::top_rows(contribBlocks[c], pivotWidth);
+
+            assert(static_cast<index_type>(contribToFront.size())
+                   == Traits::cols(contribBlock));
+
+            // Pivot part
+            for (index_type contribCol = 0; contribCol < pivotWidth; ++contribCol)
+            {
+                const index_type frontCol = contribToFront[contribCol];
+                for (index_type contribRow = 0;
+                     contribRow <= contribCol;
+                     ++contribRow)
+                {
+                    frontBlock(contribRow, frontCol) +=
+                        contribBlock(contribRow, contribCol);
+                }
+            }
+
+            // Off-diagonal part
+            for (index_type contribCol = pivotWidth;
+                 contribCol < static_cast<index_type>(contribToFront.size());
+                 ++contribCol)
+            {
+                const index_type frontCol = contribToFront[contribCol];
+                for (index_type contribRow = 0;
+                     contribRow < pivotWidth;
+                     ++contribRow)
+                {
+                    frontBlock(contribRow, frontCol) +=
+                        contribBlock(contribRow, contribCol);
+                }
+            }
+        }
+
+        // Root has no parent, so we only keep the final factorization.
+        updateIndices.clear();
+
+        const index_type blockSize =
+            Traits::rows(frontBlock);
+        const index_type nFrontIdx =
+            static_cast<index_type>(frontIndices.size());
+
+        assert(nFrontIdx == blockSize);
+
+        auto Aii = Traits::left_cols(frontBlock, blockSize);
+        Rii = Aii;
+
+        factorize_pivot(Rii);
+    }
+};
+
 } // namespace detail
+
+
+//======================================================================
+// 4. Public interface
+//
+//    This is the only function that your existing code needs to call.
+//    Its signature matches your original factorize_block_ldlt.
+//
+//    Internally, it instantiates the FactorizationKernel with the
+//    appropriate traits specialization.
+//======================================================================
+
+void factorize_block_ldlt(DefaultBlocks&       DBlocks,
+                          DefaultBlocks&       UBlocks,
+                          DefaultBlocks&       SBlocks,
+                          DefaultIndexSets&    nnzIndSets,
+                          const DefaultReordering& reorderingData,
+                          DefaultValuePtr      vals)
+{
+    using Traits = factorization_traits<
+        DefaultBlocks,
+        DefaultIndexSets,
+        DefaultReordering,
+        DefaultValuePtr>;
+
+    detail::FactorizationKernel<Traits>::run(
+        DBlocks, UBlocks, SBlocks,
+        nnzIndSets, reorderingData, vals);
+}
+
 } // namespace hplinalg
