@@ -1,0 +1,317 @@
+#include <cassert>
+#include "block_factorization.h"
+#include "merge_arrays.h"
+#include "lapack_interface.h"
+#include "blas_interface.h"
+
+namespace hplinalg
+{
+    /// @brief Selects one of two types based on a boolean condition.
+    /// @tparam T The type to select if the condition is true.
+    /// @tparam F The type to select if the condition is false.
+    /// @tparam B The boolean condition.
+    template <bool B, class T, class F>
+    using conditional_t = typename std::conditional<B, T, F>::type;
+
+    /// @brief A view into the columns of a matrix block.
+    struct InMatrixView
+    {
+        MatrixRef<const MatrixXd> block; // n_rows x |indices|
+        ArrayView<const int_t> &indices; // |indices| == block.cols()
+
+        InMatrixView(MatrixRef<const MatrixXd> m, ArrayView<const int_t> &j) : block(m), indices(j) {}
+    };
+    struct OutMatrixView
+    {
+        MatrixXd &block;        // n_rows x |indices|
+        ArrayX<int_t> &indices; // |indices| == block.cols()
+
+        OutMatrixView(MatrixXd &m, ArrayX<int_t> &j) : block(m), indices(j) {}
+    };
+
+    /// @brief Factory functions for creating matrix views.
+    inline InMatrixView make_in_view(MatrixRef<const MatrixXd> M, ArrayView<const int_t> &J) { return InMatrixView(M, J); }
+    inline InMatrixView make_in_view(MatrixXd &M, ArrayView<const int_t> &J) { return InMatrixView(MatrixRef<const MatrixXd>(M), J); }
+    inline InMatrixView make_in_view(MatrixRef<const MatrixXd> M, const ArrayX<int_t> &J)
+    {
+        ArrayView<const int_t> JView(J.data(), static_cast<index_t>(J.size()));
+        return InMatrixView(M, JView);
+    }
+    inline OutMatrixView make_out_view(MatrixXd &M, ArrayX<int_t> &J) { return OutMatrixView(M, J); }
+
+    /// @brief Extends the assembled view by adding new parts.
+    /// @param[out] assembled  The view to extend.
+    /// @param[in] childContribs  The new parts to add.
+    /// @note Each part may have overlapping columns; values in overlapping columns are summed.
+    static void extend_add_col(OutMatrixView assembled,
+                               ArrayX<InMatrixView> &childContribs)
+    {
+        auto &assembledCols = assembled.indices;
+        auto &assembledBlock = assembled.block;
+        MatrixXd assembledBlock0(assembledBlock);    // make a copy of the original block
+        ArrayX<int_t> assembledCols0(assembledCols); // make a copy of the original columns
+
+        int_t nPartInput = static_cast<int_t>(childContribs.size()) + 1;
+        ArrayX<ArrayView<const int_t>> partColViews; // may be an interval of a larger array
+        ArrayX<MatrixRef<MatrixXd>> partBlocks;
+        partColViews.reserve(nPartInput);
+        partBlocks.reserve(nPartInput);
+
+        int_t nRow = 0;
+        if (assembledBlock0.rows() > 0 && assembledBlock0.cols() > 0)
+        {
+            partColViews.push_back(ArrayView<const int_t>(assembledCols0.data(), static_cast<index_t>(assembledCols0.size())));
+            partBlocks.push_back(MatrixRef<MatrixXd>(assembledBlock0));
+            nRow = static_cast<int_t>(assembledBlock0.rows());
+        }
+
+        for (const auto &part : childContribs)
+        {
+            const auto &partBlock = part.block;
+            const auto &partCols = part.indices;
+            if (partBlock.rows() == 0 || partBlock.cols() == 0)
+                continue; // skip empty parts
+
+            partColViews.push_back(partCols);
+            partBlocks.push_back(partBlock);
+
+            if (nRow == 0)
+                nRow = static_cast<int_t>(partBlock.rows());
+            else
+                assert(nRow == static_cast<int_t>(partBlock.rows()));
+        }
+
+        index_t nPart = static_cast<index_t>(partBlocks.size());
+        if (nPart == 0)
+            return; // nothing to do
+        else if (nPart == 1)
+        {
+            // Only one non-empty part, directly copy
+            assembledCols.assign(partColViews[0].begin(), partColViews[0].end());
+            assembledBlock = partBlocks[0];
+            return;
+        }
+
+        // Build union of column indices across all parts
+        UnionInfo unionInfo;
+        build_union_from_sorted_arrays_with_maps(unionInfo, partColViews);
+        auto &unionCols = unionInfo.data;            // unique column indices
+        const auto &indexMaps = unionInfo.indexMaps; // index maps for each part
+
+        assembledCols.swap(unionCols); // set assembledCols to unionCols
+
+        assert(indexMaps.size() == nPart);
+        for (index_t p = 0; p < nPart; ++p)
+        {
+            assert(indexMaps[p].size() == static_cast<index_t>(partBlocks[p].cols()));
+        }
+
+        // Resize result block
+        const int_t nCol = static_cast<int_t>(assembledCols.size());
+        assembledBlock.setZero(nRow, nCol); // initialize to zero for accumulation
+
+        // Accumulate parts into the assembled block
+        for (index_t p = 0; p < nPart; ++p)
+        {
+            const auto partBlock = partBlocks[p];
+            const auto &indexMap = indexMaps[p];
+            const index_t nPartCol = static_cast<index_t>(partBlock.cols());
+            for (index_t partCol = 0; partCol < nPartCol; ++partCol)
+            {
+                const int_t assembledCol = indexMap[partCol];
+                assembledBlock.col(assembledCol) += partBlock.col(static_cast<int_t>(partCol));
+            }
+        }
+    }
+/// @brief Extracts the arrowhead block for a given node in the elimination tree.
+    /// @param[out] arrowhead  The output arrowhead block.
+    /// @param[out] arrowheadCols  The column indices for the arrowhead block.
+    /// @param[in] blockStartIndices  The start indices of the blocks.
+    /// @param[in] reorderedPattern  The reordered pattern.
+    /// @param[in] vals  The values of the original matrix.
+    /// @param[in] i  The node index.
+    static void get_arrowhead_block(MatrixXd &arrowhead,
+                                    ArrayX<int_t> &arrowheadCols,
+                                    const int_t rowBeginNode, // = blockStartIndices[i];
+                                    const int_t rowEndNode,   // = blockStartIndices[i + 1];
+                                    const CSR3Matrix<int_t> &reorderedPattern,
+                                    const double *vals)
+    {
+        const auto &reorderedPtrs = reorderedPattern.ptrs;
+        const auto &reorderedInds = reorderedPattern.inds;
+        const auto &reorderedVals = reorderedPattern.vals;
+
+        const int_t nRow = rowEndNode - rowBeginNode;
+        const int_t updateCutoffCol = rowEndNode;
+
+        // Collect non-zero column indices for each row of the front block‘ off-diagonal part
+        ArrayX<ArrayView<const int_t>> updateColViews(nRow); // off-diagonal column index views for each row
+        ArrayX<int_t> updateColOffset(nRow);
+        for (int_t r = rowBeginNode; r < rowEndNode; ++r)
+        {
+            const int_t localRow = r - rowBeginNode;
+            const int_t rowBegin = reorderedPtrs[r];
+            const int_t rowEnd = reorderedPtrs[r + 1];
+
+            const int_t *rowColBegin = &reorderedInds[rowBegin];
+            const int_t *rowColEnd = &reorderedInds[rowEnd];
+
+            // Find the first column index >= updateCutoffCol
+            auto updateBegin = std::lower_bound(rowColBegin, rowColEnd, updateCutoffCol);
+
+            index_t updateCount = static_cast<index_t>(rowColEnd - updateBegin);
+
+            // record the offset relative to rowBegin, ij = rowBegin + updateColOffset[localRow]
+            updateColOffset[localRow] = static_cast<int_t>(updateBegin - rowColBegin);
+
+            // Store the view of update column indices
+            updateColViews[localRow] = ArrayView<const int_t>(updateBegin, updateCount);
+        }
+
+        // Build union of update column indices across all rows of node iNode
+        UnionInfo unionInfo;
+        build_union_from_sorted_arrays_with_maps(unionInfo, updateColViews);
+
+        const auto &updateCols = unionInfo.data;     // unique update column indices
+        const auto &indexMaps = unionInfo.indexMaps; // index maps for each row
+
+        const int_t nUpdateCol = static_cast<int_t>(updateCols.size());
+        const int_t nCol = nRow + nUpdateCol;
+
+        // Prepare arrowhead column indices
+        arrowheadCols.resize(nCol);
+        std::iota(arrowheadCols.begin(), arrowheadCols.begin() + nRow, rowBeginNode);  // diagonal columns
+        std::copy(updateCols.begin(), updateCols.end(), arrowheadCols.begin() + nRow); // off-diagonal columns
+
+        // Prepare arrowhead block
+        arrowhead.setZero(nRow, nCol);
+        MatrixRef<MatrixXd> pivot = arrowhead.leftCols(nRow);
+        MatrixRef<MatrixXd> update = arrowhead.rightCols(nUpdateCol);
+
+        // Fill in arrowhead block values
+        for (int_t r = rowBeginNode; r < rowEndNode; ++r)
+        {
+            const int_t localRow = r - rowBeginNode;
+            const int_t rowBegin = reorderedPtrs[r];
+            const int_t rowEnd = reorderedPtrs[r + 1];
+            const int_t offDiagBegin = rowBegin + updateColOffset[localRow];
+
+            // Fill in diagonal part
+            for (int_t rs = rowBegin; rs < offDiagBegin; ++rs)
+            {
+                const int_t s = reorderedInds[rs];
+
+                assert(s >= rowBeginNode && s < rowEndNode); // diagonal part
+
+                const int_t localCol = s - rowBeginNode;
+                pivot(localRow, localCol) = vals[reorderedVals[rs]];
+            }
+
+            // Fill in off-diagonal part
+            const auto &indexMap = indexMaps[localRow];
+            for (int_t kLocal = 0; kLocal < static_cast<int_t>(indexMap.size()); ++kLocal)
+            {
+                const int_t rs = offDiagBegin + kLocal;
+                const int_t localCol = indexMap[kLocal];
+                update(localRow, localCol) = vals[reorderedVals[rs]];
+            }
+        }
+    }
+
+    
+    /// @brief Assemble matrices from child nodes in the elimination tree.
+    /// @param[out] assembledBlock  The assembled block matrix.
+    /// @param[out] assembledCols  The assembled column indices.
+    /// @param[in] updateColSets  The update column sets from child nodes.
+    /// @param[in] updateBlocks  The update blocks from child nodes.
+    /// @param[in] reorderingData  The reordering data.
+    /// @param[in] i  The node index.
+    static void assemble_matrices_from_children(MatrixXd &assembledBlock,
+                                                ArrayX<int_t> &assembledCols,
+                                                ArrayX<int_t> &partitions,
+                                                const ArrayX<MatrixXd> &updateBlocks,
+                                                const ArrayX<ArrayX<int_t>> &updateColSets,
+                                                const TreeNode node)
+    {
+        // Check if the current node is a leaf, in which case there are no children to assemble from
+        if (node.isLeaf())
+            return;
+
+        partitions.reserve(2);
+
+        const auto childIndices = {node.left->data, node.right->data};
+
+        auto assembled = make_out_view(assembledBlock, assembledCols);
+
+        ArrayX<InMatrixView> childContribs;
+        for (const auto childIdx : childIndices)
+        {
+            const auto &childUpdateCols = updateColSets[childIdx];
+            auto it = std::lower_bound(childUpdateCols.cbegin(), childUpdateCols.cend(), );
+            partitions.push_back(static_cast<int_t>(it - childUpdateCols.cbegin()));
+            MatrixRef<const MatrixXd> ChildContrib = updateBlocks[childIdx].topRows(partitions.back());
+            childContribs.push_back(make_in_view(ChildContrib, childUpdateCols));
+        }
+
+        extend_add_col(assembled, childContribs);
+    }
+
+
+    void ldlt_process_node(ArrayX<MatrixXd> &diagBlocks,
+                           ArrayX<MatrixXd> &UBlocks,
+                           ArrayX<MatrixXd> &updates, // updates[i] is the update block from node i to its parent
+                           ArrayX<ArrayX<int_t>> &updateColSets,
+                           const ReorderingData &reorderingData,
+                           const double *vals,
+                           const int_t i)
+    {
+        const auto &dissectionData = reorderingData.dissectionData;
+        const auto &blockStartIndices = dissectionData.blockStartIndices;
+        const auto &reorderingPattern = reorderingData.reorderedPattern;
+        /// const auto &levels = dissectionData.nodeLevels;
+        const auto &nodes = dissectionData.nodes;
+        
+        auto currentNode = nodes[i];
+        int_t rowBeginNode = blockStartIndices[i];
+        int_t rowEndNode = blockStartIndices[i + 1];
+        int_t nRowNode = rowEndNode - rowBeginNode;
+
+        // 1. Assemble front block
+        MatrixXd front;          // Assemble front block
+        ArrayX<int_t> frontCols; // Non-zero column indices of the front block
+        get_arrowhead_block(front, frontCols,
+                            rowBeginNode, rowEndNode,
+                            reorderingPattern, vals);
+
+        ArrayX<int_t> partitions;   // the split positions in children updates if it has children
+        ArrayX<int_t> childIndices; // indices of children nodes if they exist
+
+        if (!currentNode.isLeaf())
+        {
+            MatrixXd front0(front);              // make a copy of the original front
+            ArrayX<int_t> frontCols0(frontCols); // make a copy of the original front columns
+
+            int_t nFrontRow = nRowNode;
+
+            ArrayX<ArrayView<const int_t>> frontContribCols;
+            ArrayX<MatrixRef<const MatrixXd>> frontContribBlocks;
+
+            childIndices = {currentNode.left->data, currentNode.right->data};
+            partitions.reserve(3);
+            frontContribCols.reserve(3);
+            frontContribBlocks.reserve(3);
+
+            for (size_t c = 0; c < childIndices.size(); ++c)
+            {
+                const auto &frontContribCol = updateColSets[childIndices[c]];
+                auto it = std::lower_bound(frontContribCol.cbegin(), frontContribCol.cend(), rowEndNode);
+                partitions.push_back(static_cast<int_t>(it - frontContribCol.cbegin()));
+                frontContribCols.push_back(make_array_view(frontContribCol));
+            }
+            frontContribBlocks.push_back(front0);
+            frontContribCols.push_back(make_array_view(frontCols0));
+            partitions.push_back(nFrontRow);
+        }
+    }
+
+}
