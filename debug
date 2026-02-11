@@ -1,17 +1,13 @@
-namespace hplinalg {
+void forward_solve(DefaultRhs              X,
+                   const DefaultBlocks&    DBlocks,
+                   const DefaultBlocks&    UBlocks,
+                   const DefaultIndexSets& nnzIndSets,
+                   const DefaultReordering& reorderingData,
+                   DefaultValuePtr         vals);
 
-void forward_solve(MatrixRef<MatrixXd> X,
-                   const ArrayX<MatrixXd>& DBlocks,
-                   const ArrayX<MatrixXd>& UBlocks,
-                   const ArrayX<ArrayX<int_t>>& nnzIndSets,
-                   const ReorderingData& reorderingData,
-                   const double* vals);
-
-void backward_solve(MatrixRef<MatrixXd> X,
-                    const ArrayX<MatrixXd>& DBlocks,
-                    const ArrayX<MatrixXd>& UBlocks,
-                    const ArrayX<ArrayX<int_t>>& nnzIndSets,
-                    const ReorderingData& reorderingData,
-                    const double* vals);
-
-} // namespace hplinalg
+void backward_solve(DefaultRhs              X,
+                    const DefaultBlocks&    DBlocks,
+                    const DefaultBlocks&    UBlocks,
+                    const DefaultIndexSets& nnzIndSets,
+                    const DefaultReordering& reorderingData,
+                    DefaultValuePtr         vals);
