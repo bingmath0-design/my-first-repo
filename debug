@@ -1,13 +1,50 @@
+#include "separate_substitution.h"
+#include "ldlt_traits.h"
+#include "ldlt_substitution_kernel.h"
+
+namespace hplinalg
+{
+
+using SubstBlocks    = DefaultBlocks;
+using SubstIndexSets = DefaultIndexSets;
+using SubstReorder   = DefaultReordering;
+using SubstValuePtr  = DefaultValuePtr;
+
+template <typename B, typename I, typename R, typename V>
+using substitution_traits = factorization_traits<B, I, R, V>;
+
 void forward_solve(DefaultRhs              X,
                    const DefaultBlocks&    DBlocks,
                    const DefaultBlocks&    UBlocks,
                    const DefaultIndexSets& nnzIndSets,
                    const DefaultReordering& reorderingData,
-                   DefaultValuePtr         vals);
+                   DefaultValuePtr         vals)
+{
+    using Traits = substitution_traits<
+        SubstBlocks,
+        SubstIndexSets,
+        SubstReorder,
+        SubstValuePtr>;
+
+    detail::SubstitutionKernelLDLT<Traits>::forward(
+        X, DBlocks, UBlocks, nnzIndSets, reorderingData, vals);
+}
 
 void backward_solve(DefaultRhs              X,
                     const DefaultBlocks&    DBlocks,
                     const DefaultBlocks&    UBlocks,
                     const DefaultIndexSets& nnzIndSets,
                     const DefaultReordering& reorderingData,
-                    DefaultValuePtr         vals);
+                    DefaultValuePtr         vals)
+{
+    using Traits = substitution_traits<
+        SubstBlocks,
+        SubstIndexSets,
+        SubstReorder,
+        SubstValuePtr>;
+
+    detail::SubstitutionKernelLDLT<Traits>::backward(
+        X, DBlocks, UBlocks, nnzIndSets, reorderingData, vals);
+}
+
+} // namespace hplinalg
