@@ -1,44 +1,17 @@
-template <typename Traits>
-void SubstitutionKernelLDLT<Traits>::forward_solve_node(
-    MatrixRef<block_type>   X,
-    const blocks_type&      DBlocks,
-    const blocks_type&      UBlocks,
-    const index_sets_type&  nnzIndSets,
-    const reordering_type&  reorderingData,
-    value_ptr_type          vals,
-    index_type              i)
-{
-    const auto& nodes             = Traits::get_nodes(reorderingData);
-    const auto& blockStartIndices = Traits::get_block_start_indices(reorderingData);
-    const auto& blockPattern      = Traits::block_pattern(reorderingData);
-    const auto& reorderedPattern  = Traits::pattern(reorderingData);
+namespace hplinalg {
 
-    const auto& node = nodes[i];
+void forward_solve(MatrixRef<MatrixXd> X,
+                   const ArrayX<MatrixXd>& DBlocks,
+                   const ArrayX<MatrixXd>& UBlocks,
+                   const ArrayX<ArrayX<int_t>>& nnzIndSets,
+                   const ReorderingData& reorderingData,
+                   const double* vals);
 
-    const index_type blockRowStart = blockPattern.ptrs[i];
-    const index_type blockRowEnd   = blockPattern.ptrs[i + 1];
+void backward_solve(MatrixRef<MatrixXd> X,
+                    const ArrayX<MatrixXd>& DBlocks,
+                    const ArrayX<MatrixXd>& UBlocks,
+                    const ArrayX<ArrayX<int_t>>& nnzIndSets,
+                    const ReorderingData& reorderingData,
+                    const double* vals);
 
-    const auto& nnzIndices = nnzIndSets[i];
-    const auto& Rii        = DBlocks[i];
-    const block_type* ui   = &UBlocks[i];
-    block_type Ui0;
-
-    if (node.isLeaf())
-    {
-        get_leaf_offdiag_blocks(
-            Ui0, nnzIndices,
-            blockStartIndices[i], blockStartIndices[i + 1],
-            reorderedPattern, vals);
-
-        solve_pivot(Ui0, Rii);
-        ui = &Ui0;
-    }
-    const block_type& Ui = *ui;
-
-    // 后面的逻辑保持和你现在的一样：
-    // - 计算 maxUpdateSize，分配 Tmp
-    // - Xi = X.middleRows(...)
-    // - 用 gemm_t 做 deltaX = -Ui * Xi
-    // - 把 deltaX row-wise scatter 回 X
-    // - 最后 solve_pivot(Xi, Rii);
-}
+} // namespace hplinalg
