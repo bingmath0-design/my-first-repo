@@ -1,50 +1,60 @@
+#include "direct_method_core/dm_solver.h"
+#include "dense_matrix.h"
+#include "fill_reduction.h"
+#include "block_factorization.h"
 #include "separate_substitution.h"
-#include "ldlt_traits.h"
-#include "ldlt_substitution_kernel.h"
+#include "direct_method_core/types.h"
 
 namespace hplinalg
 {
+    void solve_linear_equation(const int_t dim,
+                               const int_t *ptrs,
+                               const int_t *inds,
+                               const double *vals,
+                               const int_t nrhs,
+                               double *b)
+    {
+        // 1. Fill-reduction / nested dissection reordering
+        ReorderingData reorderingData;
+        int_t mmdswitch = 30; // example switch value
+        reorder_and_partition_matrix(reorderingData, dim, ptrs, inds, mmdswitch);
 
-using SubstBlocks    = DefaultBlocks;
-using SubstIndexSets = DefaultIndexSets;
-using SubstReorder   = DefaultReordering;
-using SubstValuePtr  = DefaultValuePtr;
+        // 2. Allocate storage for block LDLT factors
+        const auto &nodes  = reorderingData.dissectionData.nodes;
+        const int_t nNodes = static_cast<int_t>(nodes.size());
 
-template <typename B, typename I, typename R, typename V>
-using substitution_traits = factorization_traits<B, I, R, V>;
+        DefaultBlocks    DBlocks(nNodes);     // diagonal (pivot) blocks
+        DefaultBlocks    UBlocks(nNodes);     // off-diagonal update / linkage blocks
+        DefaultBlocks    SBlocks(nNodes);     // Schur complement contribution blocks
+        DefaultIndexSets nnzIndSets(nNodes);  // update index sets per node
 
-void forward_solve(DefaultRhs              X,
-                   const DefaultBlocks&    DBlocks,
-                   const DefaultBlocks&    UBlocks,
-                   const DefaultIndexSets& nnzIndSets,
-                   const DefaultReordering& reorderingData,
-                   DefaultValuePtr         vals)
-{
-    using Traits = substitution_traits<
-        SubstBlocks,
-        SubstIndexSets,
-        SubstReorder,
-        SubstValuePtr>;
+        // 3. Block LDLT factorization in the reordered / partitioned space
+        factorize_block_ldlt(DBlocks,
+                             UBlocks,
+                             SBlocks,
+                             nnzIndSets,
+                             reorderingData,
+                             vals);
 
-    detail::SubstitutionKernelLDLT<Traits>::forward(
-        X, DBlocks, UBlocks, nnzIndSets, reorderingData, vals);
-}
+        // 4. Solve the system via forward and backward substitution
+        //
+        //    X wraps the RHS array b as a dense matrix view of size dim x nrhs.
+        //    Modifications to X will be written back into b in-place.
+        int_t ldx = dim;
+        Array2Matrix<MatrixXd> X(b, ldx, nrhs);
 
-void backward_solve(DefaultRhs              X,
-                    const DefaultBlocks&    DBlocks,
-                    const DefaultBlocks&    UBlocks,
-                    const DefaultIndexSets& nnzIndSets,
-                    const DefaultReordering& reorderingData,
-                    DefaultValuePtr         vals)
-{
-    using Traits = substitution_traits<
-        SubstBlocks,
-        SubstIndexSets,
-        SubstReorder,
-        SubstValuePtr>;
+        forward_solve(X,
+                      DBlocks,
+                      UBlocks,
+                      nnzIndSets,
+                      reorderingData,
+                      vals);
 
-    detail::SubstitutionKernelLDLT<Traits>::backward(
-        X, DBlocks, UBlocks, nnzIndSets, reorderingData, vals);
-}
-
+        backward_solve(X,
+                       DBlocks,
+                       UBlocks,
+                       nnzIndSets,
+                       reorderingData,
+                       vals);
+    }
 } // namespace hplinalg
