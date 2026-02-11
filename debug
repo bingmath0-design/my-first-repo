@@ -1,47 +1,48 @@
-#include "separate_substitution.h"
-#include "ldlt_traits.h"
-#include "ldlt_substitution_kernel.h"
-
-namespace hplinalg
+template <typename Traits>
+struct SubstitutionKernelLDLT
 {
+    using blocks_type     = typename Traits::blocks_type;     // ArrayX<MatrixXd>
+    using index_sets_type = typename Traits::index_sets_type; // ArrayX<ArrayX<int_t>>
+    using reordering_type = typename Traits::reordering_type;
+    using value_ptr_type  = typename Traits::value_ptr_type;
+    using block_type      = typename Traits::block_type;
+    using index_type      = typename Traits::index_type;
+    using pattern_type    = typename Traits::pattern_type;
+    using index_array_type= typename Traits::index_array_type;
+    // ...
 
-using SubstBlocks    = DefaultBlocks;
-using SubstIndexSets = DefaultIndexSets;
-using SubstReorder   = DefaultReordering;
-using SubstValuePtr  = DefaultValuePtr;
+    static void forward(MatrixRef<block_type>    X,
+                        const blocks_type&       DBlocks,
+                        const blocks_type&       UBlocks,
+                        const index_sets_type&   nnzIndSets,
+                        const reordering_type&   reorderingData,
+                        value_ptr_type           vals);
 
-// 求解端的 traits 直接复用 factorization_traits
-template <typename B, typename I, typename R, typename V>
-using substitution_traits = factorization_traits<B, I, R, V>;
+    static void backward(MatrixRef<block_type>   X,
+                         const blocks_type&      DBlocks,
+                         const blocks_type&      UBlocks,
+                         const index_sets_type&  nnzIndSets,
+                         const reordering_type&  reorderingData,
+                         value_ptr_type          vals);
 
-void forward_solve(MatrixRef<MatrixXd> X,
-                   const FactorizationData& factorizationData,
-                   const ReorderingData&   reorderingData,
-                   const double*           vals)
-{
-    using Traits = substitution_traits<
-        SubstBlocks,
-        SubstIndexSets,
-        SubstReorder,
-        SubstValuePtr>;
+private:
+    static void forward_solve_node(
+        MatrixRef<block_type>   X,
+        const blocks_type&      DBlocks,
+        const blocks_type&      UBlocks,
+        const index_sets_type&  nnzIndSets,
+        const reordering_type&  reorderingData,
+        value_ptr_type          vals,
+        index_type              i);
 
-    detail::SubstitutionKernelLDLT<Traits>::forward(
-        X, factorizationData, reorderingData, vals);
-}
+    static void backward_solve_node(
+        MatrixRef<block_type>   X,
+        const blocks_type&      DBlocks,
+        const blocks_type&      UBlocks,
+        const index_sets_type&  nnzIndSets,
+        const reordering_type&  reorderingData,
+        value_ptr_type          vals,
+        index_type              i);
 
-void backward_solve(MatrixRef<MatrixXd> X,
-                    const FactorizationData& factorizationData,
-                    const ReorderingData&   reorderingData,
-                    const double*           vals)
-{
-    using Traits = substitution_traits<
-        SubstBlocks,
-        SubstIndexSets,
-        SubstReorder,
-        SubstValuePtr>;
-
-    detail::SubstitutionKernelLDLT<Traits>::backward(
-        X, factorizationData, reorderingData, vals);
-}
-
-} // namespace hplinalg
+    // ... get_leaf_offdiag_blocks 保持不变 ...
+};
