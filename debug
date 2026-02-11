@@ -1,48 +1,44 @@
 template <typename Traits>
-struct SubstitutionKernelLDLT
+void SubstitutionKernelLDLT<Traits>::forward_solve_node(
+    MatrixRef<block_type>   X,
+    const blocks_type&      DBlocks,
+    const blocks_type&      UBlocks,
+    const index_sets_type&  nnzIndSets,
+    const reordering_type&  reorderingData,
+    value_ptr_type          vals,
+    index_type              i)
 {
-    using blocks_type     = typename Traits::blocks_type;     // ArrayX<MatrixXd>
-    using index_sets_type = typename Traits::index_sets_type; // ArrayX<ArrayX<int_t>>
-    using reordering_type = typename Traits::reordering_type;
-    using value_ptr_type  = typename Traits::value_ptr_type;
-    using block_type      = typename Traits::block_type;
-    using index_type      = typename Traits::index_type;
-    using pattern_type    = typename Traits::pattern_type;
-    using index_array_type= typename Traits::index_array_type;
-    // ...
+    const auto& nodes             = Traits::get_nodes(reorderingData);
+    const auto& blockStartIndices = Traits::get_block_start_indices(reorderingData);
+    const auto& blockPattern      = Traits::block_pattern(reorderingData);
+    const auto& reorderedPattern  = Traits::pattern(reorderingData);
 
-    static void forward(MatrixRef<block_type>    X,
-                        const blocks_type&       DBlocks,
-                        const blocks_type&       UBlocks,
-                        const index_sets_type&   nnzIndSets,
-                        const reordering_type&   reorderingData,
-                        value_ptr_type           vals);
+    const auto& node = nodes[i];
 
-    static void backward(MatrixRef<block_type>   X,
-                         const blocks_type&      DBlocks,
-                         const blocks_type&      UBlocks,
-                         const index_sets_type&  nnzIndSets,
-                         const reordering_type&  reorderingData,
-                         value_ptr_type          vals);
+    const index_type blockRowStart = blockPattern.ptrs[i];
+    const index_type blockRowEnd   = blockPattern.ptrs[i + 1];
 
-private:
-    static void forward_solve_node(
-        MatrixRef<block_type>   X,
-        const blocks_type&      DBlocks,
-        const blocks_type&      UBlocks,
-        const index_sets_type&  nnzIndSets,
-        const reordering_type&  reorderingData,
-        value_ptr_type          vals,
-        index_type              i);
+    const auto& nnzIndices = nnzIndSets[i];
+    const auto& Rii        = DBlocks[i];
+    const block_type* ui   = &UBlocks[i];
+    block_type Ui0;
 
-    static void backward_solve_node(
-        MatrixRef<block_type>   X,
-        const blocks_type&      DBlocks,
-        const blocks_type&      UBlocks,
-        const index_sets_type&  nnzIndSets,
-        const reordering_type&  reorderingData,
-        value_ptr_type          vals,
-        index_type              i);
+    if (node.isLeaf())
+    {
+        get_leaf_offdiag_blocks(
+            Ui0, nnzIndices,
+            blockStartIndices[i], blockStartIndices[i + 1],
+            reorderedPattern, vals);
 
-    // ... get_leaf_offdiag_blocks 保持不变 ...
-};
+        solve_pivot(Ui0, Rii);
+        ui = &Ui0;
+    }
+    const block_type& Ui = *ui;
+
+    // 后面的逻辑保持和你现在的一样：
+    // - 计算 maxUpdateSize，分配 Tmp
+    // - Xi = X.middleRows(...)
+    // - 用 gemm_t 做 deltaX = -Ui * Xi
+    // - 把 deltaX row-wise scatter 回 X
+    // - 最后 solve_pivot(Xi, Rii);
+}
