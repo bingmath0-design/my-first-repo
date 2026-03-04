@@ -1,148 +1,68 @@
-#pragma once
-
-#include "direct_method_core/types.h" //int_t, ArrayX
-
-#include "data/dense_matrix.h"  //MatrixXd
-#include "data/sparse_matrix.h" //CSR3Matrix
-
-#include "utils/array_view.h" //ArrayX, ArrayView
-
-#include "fill_reduction.h" //ReorderingData
-namespace hplinalg
-{
-    //======================================================================
-    //    Factorization traits
-    //
-    //    All concrete types (blocks, index sets, reordering,
-    //    value pointer) are described in a traits struct so that
-    //    the factorization kernel only depends on a single traits interface.
-    //======================================================================
-
-    using DefaultBlocks = ArrayX<MatrixXd>;
-    using DefaultIndexSets = ArrayX<ArrayX<int_t>>;
-    using DefaultReordering = ReorderingData;
-    using DefaultValuePtr = const double *;
-
-    // Generic primary template - left undefined on purpose.
-    // Specializations will describe how to access the types and members.
-    template <typename BlocksT,
-              typename IndexSetsT,
-              typename ReorderingT,
-              typename ValuePtrT>
-    struct factorization_traits;
-
-    //------------------------------------------------------------------
-    // Specialization for the current back-end:
-    //   - Blocks are ArrayX<MatrixXd>
-    //   - Index sets are ArrayX<ArrayX<int_t>>
-    //   - ReorderingData is your existing struct
-    //   - Values are provided via const double*
-    //------------------------------------------------------------------
-    template <>
-    struct factorization_traits<DefaultBlocks,
-                                DefaultIndexSets,
-                                DefaultReordering,
-                                DefaultValuePtr>
-    {
-        using blocks_type = DefaultBlocks;
-        using index_sets_type = DefaultIndexSets;
-        using reordering_type = DefaultReordering;
-        using value_ptr_type = DefaultValuePtr;
-
-        using block_type = MatrixXd;
-        using index_type = int_t;
-        using global_index_type = int_t;
-        using pattern_type = CSR3Matrix<int_t>;
-        using index_array_type = ArrayX<index_type>;
-        using index_view_type = ArrayView<const index_type>;
-
-        using rhs_value_type = block_type; 
-        using rhs_ref_type = MatrixRef<block_type>; 
-
-        // Deduce node container type and block-start-indices container type
-        // directly from ReorderingData, so if you change that struct later,
-        // the kernel code does not need to be touched.
-        using nodes_container_type =
-            decltype(std::declval<reordering_type>().dissectionData.nodes);
-
-        using block_start_indices_type =
-            decltype(std::declval<reordering_type>().dissectionData.blockStartIndices);
-
-        // Accessors for reordering components
-        static const pattern_type &pattern(const reordering_type &r)
-        {
-            return r.reorderedPattern;
-        }
-
-        static const nodes_container_type &get_nodes(const reordering_type &r)
-        {
-            return r.dissectionData.nodes;
-        }
-
-        static const block_start_indices_type &
-        get_block_start_indices(const reordering_type &r)
-        {
-            return r.dissectionData.blockStartIndices;
-        }
-
-        // Matrix helpers. If you change to a different matrix back-end,
-        // only these helper functions (and typedefs above) need to be updated.
-        static inline void set_zero(block_type &A,
-                                    index_type rows,
-                                    index_type cols)
-        {
-            A.setZero(rows, cols);
-        }
-
-        static inline block_type make_zero(index_type rows,
-                                           index_type cols)
-        {
-            block_type A;
-            A.setZero(rows, cols);
-            return A;
-        }
-
-        // Helper type aliases for Eigen-style views.
-        // Using decltype(std::declval<block_type&>().leftCols(0)) avoids the need
-        // for C++14 return-type deduction with `auto` and keeps this C++11-friendly.
-        using left_cols_return_type =
-            decltype(std::declval<block_type &>().leftCols(0));
-        using right_cols_return_type =
-            decltype(std::declval<block_type &>().rightCols(0));
-        using top_rows_return_type =
-            decltype(std::declval<block_type &>().topRows(0));
-
-        static inline left_cols_return_type
-        left_cols(block_type &A, index_type n)
-        {
-            return A.leftCols(n);
-        }
-
-        static inline right_cols_return_type
-        right_cols(block_type &A, index_type n)
-        {
-            return A.rightCols(n);
-        }
-
-        static inline top_rows_return_type
-        top_rows(block_type &A, index_type n)
-        {
-            return A.topRows(n);
-        }
-
-        static inline index_type rows(const block_type &A)
-        {
-            return static_cast<index_type>(A.rows());
-        }
-
-        static inline index_type cols(const block_type &A)
-        {
-            return static_cast<index_type>(A.cols());
-        }
-    };
-
-    using DefaultRhs = MatrixRef<MatrixXd>;
-    template <typename B, typename I, typename R, typename V>
-    
-    using substitution_traits = factorization_traits<B, I, R, V>;
-} // namespace hplinalg
+[main] Building folder: c:/Users/admin/Desktop/hplinalg/build 
+[build] Starting build
+[proc] Executing command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" --build c:/Users/admin/Desktop/hplinalg/build --config Debug --target all --
+[build] [7/11   9% :: 0.085] Building CXX object src/CMakeFiles/hplinalg_utils.dir/utils/merge_arrays.cpp.obj
+[build] FAILED: [code=1] src/CMakeFiles/hplinalg_utils.dir/utils/merge_arrays.cpp.obj 
+[build] C:\msys64\ucrt64\bin\g++.exe  -IC:/Users/admin/Desktop/hplinalg/src -g -std=gnu++17 -MD -MT src/CMakeFiles/hplinalg_utils.dir/utils/merge_arrays.cpp.obj -MF src\CMakeFiles\hplinalg_utils.dir\utils\merge_arrays.cpp.obj.d -o src/CMakeFiles/hplinalg_utils.dir/utils/merge_arrays.cpp.obj -c C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp
+[build] In file included from C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:1:
+[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.h:2:10: fatal error: types.h: No such file or directory
+[build]     2 | #include "types.h"
+[build]       |          ^~~~~~~~~
+[build] compilation terminated.
+[build] [7/11  18% :: 0.085] Building CXX object src/CMakeFiles/hplinalg_backend.dir/backend/blas_interface.cpp.obj
+[build] FAILED: [code=1] src/CMakeFiles/hplinalg_backend.dir/backend/blas_interface.cpp.obj 
+[build] C:\msys64\ucrt64\bin\g++.exe -DUSE_MKL -IC:/Users/admin/Desktop/hplinalg/src -I/include -g -std=gnu++17 -MD -MT src/CMakeFiles/hplinalg_backend.dir/backend/blas_interface.cpp.obj -MF src\CMakeFiles\hplinalg_backend.dir\backend\blas_interface.cpp.obj.d -o src/CMakeFiles/hplinalg_backend.dir/backend/blas_interface.cpp.obj -c C:/Users/admin/Desktop/hplinalg/src/backend/blas_interface.cpp
+[build] In file included from C:/Users/admin/Desktop/hplinalg/src/backend/blas_interface.cpp:1:
+[build] C:/Users/admin/Desktop/hplinalg/src/backend/blas_interface.h:2:10: fatal error: direct_method_core/types.h: No such file or directory
+[build]     2 | #include "direct_method_core/types.h"
+[build]       |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[build] compilation terminated.
+[build] [7/11  27% :: 0.086] Building CXX object src/CMakeFiles/hplinalg_backend.dir/backend/lapack_interface.cpp.obj
+[build] FAILED: [code=1] src/CMakeFiles/hplinalg_backend.dir/backend/lapack_interface.cpp.obj 
+[build] C:\msys64\ucrt64\bin\g++.exe -DUSE_MKL -IC:/Users/admin/Desktop/hplinalg/src -I/include -g -std=gnu++17 -MD -MT src/CMakeFiles/hplinalg_backend.dir/backend/lapack_interface.cpp.obj -MF src\CMakeFiles\hplinalg_backend.dir\backend\lapack_interface.cpp.obj.d -o src/CMakeFiles/hplinalg_backend.dir/backend/lapack_interface.cpp.obj -c C:/Users/admin/Desktop/hplinalg/src/backend/lapack_interface.cpp
+[build] In file included from C:/Users/admin/Desktop/hplinalg/src/backend/lapack_interface.h:2,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/backend/lapack_interface.cpp:1:
+[build] C:/Users/admin/Desktop/hplinalg/src/data/dense_matrix.h:2:10: fatal error: Eigen/Dense: No such file or directory
+[build]     2 | #include "Eigen/Dense"
+[build]       |          ^~~~~~~~~~~~~
+[build] compilation terminated.
+[build] [7/11  36% :: 0.265] Building CXX object src/CMakeFiles/direct_method_core.dir/core/fill_reduction.cpp.obj
+[build] FAILED: [code=1] src/CMakeFiles/direct_method_core.dir/core/fill_reduction.cpp.obj 
+[build] C:\msys64\ucrt64\bin\g++.exe  -IC:/Users/admin/Desktop/hplinalg/include -IC:/Users/admin/Desktop/hplinalg/src -IC:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0 -g -std=gnu++17 -MD -MT src/CMakeFiles/direct_method_core.dir/core/fill_reduction.cpp.obj -MF src\CMakeFiles\direct_method_core.dir\core\fill_reduction.cpp.obj.d -o src/CMakeFiles/direct_method_core.dir/core/fill_reduction.cpp.obj -c C:/Users/admin/Desktop/hplinalg/src/core/fill_reduction.cpp
+[build] In file included from C:/Users/admin/Desktop/hplinalg/src/core/fill_reduction.cpp:1:
+[build] C:/Users/admin/Desktop/hplinalg/src/core/fill_reduction.h:7:10: fatal error: nested_dissection.h: No such file or directory
+[build]     7 | #include "nested_dissection.h"
+[build]       |          ^~~~~~~~~~~~~~~~~~~~~
+[build] compilation terminated.
+[build] [7/11  45% :: 0.468] Building CXX object src/CMakeFiles/direct_method_core.dir/core/dm_solver.cpp.obj
+[build] FAILED: [code=1] src/CMakeFiles/direct_method_core.dir/core/dm_solver.cpp.obj 
+[build] C:\msys64\ucrt64\bin\g++.exe  -IC:/Users/admin/Desktop/hplinalg/include -IC:/Users/admin/Desktop/hplinalg/src -IC:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0 -g -std=gnu++17 -MD -MT src/CMakeFiles/direct_method_core.dir/core/dm_solver.cpp.obj -MF src\CMakeFiles\direct_method_core.dir\core\dm_solver.cpp.obj.d -o src/CMakeFiles/direct_method_core.dir/core/dm_solver.cpp.obj -c C:/Users/admin/Desktop/hplinalg/src/core/dm_solver.cpp
+[build] In file included from C:/Users/admin/Desktop/hplinalg/src/core/dm_solver.cpp:6:
+[build] C:/Users/admin/Desktop/hplinalg/src/core/fill_reduction.h:7:10: fatal error: nested_dissection.h: No such file or directory
+[build]     7 | #include "nested_dissection.h"
+[build]       |          ^~~~~~~~~~~~~~~~~~~~~
+[build] compilation terminated.
+[build] [7/11  54% :: 0.468] Building CXX object src/CMakeFiles/direct_method_core.dir/core/separate_substitution.cpp.obj
+[build] FAILED: [code=1] src/CMakeFiles/direct_method_core.dir/core/separate_substitution.cpp.obj 
+[build] C:\msys64\ucrt64\bin\g++.exe  -IC:/Users/admin/Desktop/hplinalg/include -IC:/Users/admin/Desktop/hplinalg/src -IC:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0 -g -std=gnu++17 -MD -MT src/CMakeFiles/direct_method_core.dir/core/separate_substitution.cpp.obj -MF src\CMakeFiles\direct_method_core.dir\core\separate_substitution.cpp.obj.d -o src/CMakeFiles/direct_method_core.dir/core/separate_substitution.cpp.obj -c C:/Users/admin/Desktop/hplinalg/src/core/separate_substitution.cpp
+[build] In file included from C:/Users/admin/Desktop/hplinalg/src/core/ldlt_traits.h:7,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/core/separate_substitution.h:2,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/core/separate_substitution.cpp:1:
+[build] C:/Users/admin/Desktop/hplinalg/src/utils/array_view.h:3:10: fatal error: types.h: No such file or directory
+[build]     3 | #include "types.h"
+[build]       |          ^~~~~~~~~
+[build] compilation terminated.
+[build] [7/11  63% :: 0.641] Building CXX object src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj
+[build] FAILED: [code=1] src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj 
+[build] C:\msys64\ucrt64\bin\g++.exe  -IC:/Users/admin/Desktop/hplinalg/include -IC:/Users/admin/Desktop/hplinalg/src -IC:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0 -g -std=gnu++17 -MD -MT src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj -MF src\CMakeFiles\direct_method_core.dir\core\block_factorization.cpp.obj.d -o src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj -c C:/Users/admin/Desktop/hplinalg/src/core/block_factorization.cpp
+[build] In file included from C:/Users/admin/Desktop/hplinalg/src/core/block_factorization_kernel.h:4,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/core/block_factorization.h:1,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/core/block_factorization.cpp:1:
+[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.h:2:10: fatal error: types.h: No such file or directory
+[build]     2 | #include "types.h"
+[build]       |          ^~~~~~~~~
+[build] compilation terminated.
+[build] ninja: build stopped: subcommand failed.
+[proc] The command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" --build c:/Users/admin/Desktop/hplinalg/build --config Debug --target all -- exited with code: 1
+[driver] Build completed: 00:00:00.701
+[build] Build finished with exit code 1
