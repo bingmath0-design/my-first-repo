@@ -1,153 +1,35 @@
-src里的
-#-------------Utils-----------------
-file(
-    GLOB UTILS_SOURCES
-    utils/*.cpp
-)
-
-add_library(
-    hplinalg_utils
-    STATIC 
-        ${UTILS_SOURCES}
-)
-
-target_include_directories(
-    hplinalg_utils
-    PUBLIC 
-        ${PROJECT_SOURCE_DIR}/src
-        ${PROJECT_SOURCE_DIR}/include
-)   
-
-
-#-------------Data Layer (header-only)-----------------
-add_library(
-    hplinalg_data
-    INTERFACE 
-)
-
-target_include_directories(
-    hplinalg_data
-    INTERFACE
-        ${PROJECT_SOURCE_DIR}/src
-        ${PROJECT_SOURCE_DIR}/include
-)
-
-target_link_directories(
-    hplinalg_data
-    INTERFACE
-        hplinalg_utils
-        eigen_headers
-)
-
-
-#-------------Backend-----------------
-file(
-    GLOB BACKEND_SOURCES
-    backend/*.cpp
-)
-
-if(NOT BACKEND_SOURCES)
-    message(FATAL_ERROR "No backend source files found in ${PROJECT_SOURCE_DIR}/backend")
-endif(NOT BACKEND_SOURCES)
-
-add_library(
-    hplinalg_backend
-    STATIC
-        ${BACKEND_SOURCES}
-)
-
-target_include_directories(
-    hplinalg_backend
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}/src
-        ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/external/eigen-5.0.0
-)
-
-target_link_libraries(
-    hplinalg_backend
-    PUBLIC
-        hplinalg_data 
-        hplinalg_utils 
-)
-
-if(USE_MKL)
-    target_compile_definitions(
-        hplinalg_backend
-        PRIVATE
-            USE_MKL   
-    )
-
-    target_include_directories(
-        hplinalg_backend
-        PRIVATE
-            ${MKL_ROOT}/include
-    )
-    
-    target_link_directories(
-        hplinalg_backend
-        PRIVATE
-            ${PROJECT_SOURCE_DIR}/external/mkl_import
-    )
-    
-    target_link_libraries(
-        hplinalg_backend
-        PRIVATE
-            mkl_rt
-    )
-endif(USE_MKL)
-
-
-#-------------Core-----------------
-file(
-    GLOB CORE_SOURCES
-    core/*.cpp
-)
-
-add_library(
-    direct_method_core
-    STATIC
-        ${CORE_SOURCES}
-)
-
-target_include_directories(
-    direct_method_core
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/src
-)
-
-target_link_libraries(
-    direct_method_core
-    PUBLIC
-        hplinalg_backend
-        hplinalg_data
-        hplinalg_utils
-)
-
-顶层的
-cmake_minimum_required(VERSION 3.20)
-
-project(DirectMethodCore LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-#------------------- Options ------------------
-option(USE_MKL "Use Intel MKL backend" ON)
-
-if(NOT DEFINED MKLROOT AND DEFINED ENV{MKLROOT})
-    set(MKLROOT $ENV{MKLROOT})
-endif(NOT DEFINED MKLROOT AND DEFINED ENV{MKLROOT})
-
-
-#------------------- Eigen Header-only ------------------
-add_library(eigen_headers INTERFACE)
-target_include_directories(
-    eigen_headers 
-    INTERFACE 
-        ${PROJECT_SOURCE_DIR}/external/eigen-5.0.0
-)
-
-add_subdirectory(src)
-add_subdirectory(tests)
+[main] Building folder: c:/Users/admin/Desktop/hplinalg/build 
+[main] Configuring project: hplinalg 
+[proc] Executing command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE -DCMAKE_C_COMPILER:FILEPATH=C:\msys64\ucrt64\bin\gcc.exe -DCMAKE_CXX_COMPILER:FILEPATH=C:\msys64\ucrt64\bin\g++.exe --no-warn-unused-cli -S C:/Users/admin/Desktop/hplinalg -B c:/Users/admin/Desktop/hplinalg/build -G Ninja
+[cmake] Not searching for unused variables given on the command line.
+[cmake] -- Configuring done (0.2s)
+[cmake] CMake Error in CMakeLists.txt:
+[cmake]   IMPORTED_IMPLIB not set for imported target "NCTIETree::NCTIETree"
+[cmake]   configuration "Debug".
+[cmake] 
+[cmake] 
+[cmake] CMake Error in CMakeLists.txt:
+[cmake]   IMPORTED_IMPLIB not set for imported target "NCTIETree::NCTIETree"
+[cmake]   configuration "Debug".
+[cmake] 
+[cmake] 
+[cmake] CMake Error:
+[cmake]   Running
+[cmake] 
+[cmake]    'C:/msys64/ucrt64/bin/ninja.exe' '-C' 'C:/Users/admin/Desktop/hplinalg/build' '-t' 'recompact'
+[cmake] 
+[cmake]   failed with:
+[cmake] 
+[cmake]    ninja: error: build.ninja:35: loading 'CMakeFiles/rules.ninja': The system cannot find the file specified.
+[cmake] 
+[cmake]   
+[cmake] 
+[cmake]   include CMakeFiles/rules.ninja
+[cmake] 
+[cmake]                                 ^ near here
+[cmake] 
+[cmake] 
+[cmake] 
+[cmake] -- Generating done (0.1s)
+[cmake] CMake Generate step failed.  Build files cannot be regenerated correctly.
+[proc] The command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE -DCMAKE_C_COMPILER:FILEPATH=C:\msys64\ucrt64\bin\gcc.exe -DCMAKE_CXX_COMPILER:FILEPATH=C:\msys64\ucrt64\bin\g++.exe --no-warn-unused-cli -S C:/Users/admin/Desktop/hplinalg -B c:/Users/admin/Desktop/hplinalg/build -G Ninja exited with code: 1
