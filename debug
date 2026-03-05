@@ -1,35 +1,55 @@
-
-    /// @brief Heap entry for k-way merge
-    using HeapEntry = std::pair<index_t, index_t>; // (array index k, element index kIndex), value = arrays[k][kIndex]
-    struct HeapEntryCompare
-    {
-        const ArrayX<ArrayView<int_t>> &arrays;
-
-        HeapEntryCompare(const ArrayX<ArrayView<int_t>> &arrs) : arrays(arrs) {}
-
-        bool operator()(const HeapEntry &a, const HeapEntry &b) const
-        {
-            int_t valA = arrays[a.first][a.second];
-            int_t valB = arrays[b.first][b.second];
-            return valA > valB; // min-heap
-        }
-    };
-
-ArrayX<HeapEntry> heapBuffer;
-        heapBuffer.reserve(K);
-        std::priority_queue<HeapEntry, ArrayX<HeapEntry>, HeapEntryCompare> minHeap(HeapEntryCompare(arrays), std::move(heapBuffer));
-
-
-
-C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:213:85: error: no matching function for call to 'hplinalg::HeapEntryCompare::HeapEntryCompare(hplinalg::ArrayX<hplinalg::Span<const int> >&)'
-[build]   213 |         std::priority_queue<HeapEntry, ArrayX<HeapEntry>, HeapEntryCompare> minHeap(HeapEntryCompare(arrays), std::move(heapBuffer));
-[build]       |                                                                                     ^~~~~~~~~~~~~~~~~~~~~~~~
-[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:213:85: note: there are 3 candidates
-[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:170:9: note: candidate 1: 'hplinalg::HeapEntryCompare::HeapEntryCompare(hplinalg::ArrayX<hplinalg::Span<int> >&)'
-[build]   170 |         HeapEntryCompare(const ArrayX<ArrayView<int_t>> &arrs) : arrays(arrs) {}
-[build]       |         ^~~~~~~~~~~~~~~~
-[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:170:58: note: no known conversion for argument 1 from 'hplinalg::ArrayX<hplinalg::Span<const int> >' {aka 'const std::vector<hplinalg::Span<const int>, std::allocator<hplinalg::Span<const int> > >'} to 'hplinalg::ArrayX<hplinalg::Span<int> >&' {aka 'const std::vector<hplinalg::Span<int>, std::allocator<hplinalg::Span<int> > >&'}
-[build]   170 |         HeapEntryCompare(const ArrayX<ArrayView<int_t>> &arrs) : arrays(arrs) {}
-[build]       |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~
-[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:166:12: note: candidate 2: 'constexpr hplinalg::HeapEntryCompare::HeapEntryCompare(const hplinalg::HeapEntryCompare&)'
-[build]   166 |     struct HeapEntryCompare
+[main] Building folder: c:/Users/admin/Desktop/hplinalg/build 
+[build] Starting build
+[proc] Executing command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" --build c:/Users/admin/Desktop/hplinalg/build --config Debug --target all --
+[build] [2/4  25% :: 2.202] Building CXX object src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj
+[build] FAILED: [code=1] src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj 
+[build] C:\msys64\ucrt64\bin\g++.exe  -IC:/Users/admin/Desktop/hplinalg/include -IC:/Users/admin/Desktop/hplinalg/src -IC:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0 -isystem C:/Users/admin/Desktop/hplinalg/external/etree_gcc_win/include -g -std=gnu++17 -MD -MT src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj -MF src\CMakeFiles\direct_method_core.dir\core\block_factorization.cpp.obj.d -o src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj -c C:/Users/admin/Desktop/hplinalg/src/core/block_factorization.cpp
+[build] In file included from C:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0/Eigen/Core:183,
+[build]                  from C:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0/Eigen/Dense:1,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/data/dense_matrix.h:2,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/core/ldlt_traits.h:4,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/core/block_factorization.h:1,
+[build]                  from C:/Users/admin/Desktop/hplinalg/src/core/block_factorization.cpp:1:
+[build] C:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0/Eigen/src/Core/DenseBase.h: In instantiation of 'void Eigen::DenseBase<Derived>::swap(const Eigen::DenseBase<OtherDerived>&) [with OtherDerived = Eigen::Matrix<double, -1, -1>; Derived = Eigen::Matrix<double, -1, -1>]':
+[build] C:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0/Eigen/src/Core/PlainObjectBase.h:882:15:   required from 'void Eigen::PlainObjectBase<Derived>::swap(const Eigen::DenseBase<OtherDerived>&) [with OtherDerived = Eigen::Matrix<double, -1, -1>; Derived = Eigen::Matrix<double, -1, -1>]'
+[build]   882 |     Base::swap(other.derived());
+[build]       |     ~~~~~~~~~~^~~~~~~~~~~~~~~~~
+[build] C:/Users/admin/Desktop/hplinalg/src/core/block_factorization_kernel.h:114:27:   required from 'static void hplinalg::detail::FactorizationKernel<Traits>::release_block(block_type&) [with Traits = hplinalg::factorization_traits<std::vector<Eigen::Matrix<double, -1, -1>, std::allocator<Eigen::Matrix<double, -1, -1> > >, std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > >, hplinalg::ReorderingData, const double*>; block_type = Eigen::Matrix<double, -1, -1>]'
+[build]   114 |                 block.swap(Traits::make_zero(0, 0));
+[build]       |                 ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+[build] C:/Users/admin/Desktop/hplinalg/src/core/block_factorization_kernel.h:269:30:   required from 'static void hplinalg::detail::FactorizationKernel<Traits>::factorize_leaf_node(block_type&, block_type&, block_type&, index_array_type&, index_type, index_type, const PtrArray&, const IndArray&, const ValIndexArray&, value_ptr_type) [with PtrArray = std::vector<int, std::allocator<int> >; IndArray = std::vector<int, std::allocator<int> >; ValIndexArray = std::vector<int, std::allocator<int> >; Traits = hplinalg::factorization_traits<std::vector<Eigen::Matrix<double, -1, -1>, std::allocator<Eigen::Matrix<double, -1, -1> > >, std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > >, hplinalg::ReorderingData, const double*>; block_type = Eigen::Matrix<double, -1, -1>; index_array_type = std::vector<int, std::allocator<int> >; index_type = int; value_ptr_type = const double*]'
+[build]   269 |                 release_block(Ui);
+[build]       |                 ~~~~~~~~~~~~~^~~~
+[build] C:/Users/admin/Desktop/hplinalg/src/core/block_factorization_kernel.h:74:44:   required from 'static void hplinalg::detail::FactorizationKernel<Traits>::run(blocks_type&, blocks_type&, blocks_type&, index_sets_type&, const reordering_type&, value_ptr_type) [with Traits = hplinalg::factorization_traits<std::vector<Eigen::Matrix<double, -1, -1>, std::allocator<Eigen::Matrix<double, -1, -1> > >, std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > >, hplinalg::ReorderingData, const double*>; blocks_type = std::vector<Eigen::Matrix<double, -1, -1>, std::allocator<Eigen::Matrix<double, -1, -1> > >; index_sets_type = std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > >; reordering_type = hplinalg::ReorderingData; value_ptr_type = const double*]'
+[build]    74 |                         factorize_leaf_node(
+[build]       |                         ~~~~~~~~~~~~~~~~~~~^
+[build]    75 |                             Rii, Ui, updateBlock, updateIndices,
+[build]       |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[build]    76 |                             rowBegin, rowEnd,
+[build]       |                             ~~~~~~~~~~~~~~~~~
+[build]    77 |                             reorderedPtrs, reorderedInds, reorderedVals,
+[build]       |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[build]    78 |                             vals);
+[build]       |                             ~~~~~           
+[build] C:/Users/admin/Desktop/hplinalg/src/core/block_factorization.cpp:18:49:   required from here
+[build]    18 |         detail::FactorizationKernel<Traits>::run(DBlocks, UBlocks, SBlocks,
+[build]       |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+[build]    19 |                                                  nnzIndSets, reorderingData, vals);
+[build]       |                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[build] C:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0/Eigen/src/Core/DenseBase.h:398:25: error: static assertion failed: THIS_EXPRESSION_IS_NOT_A_LVALUE__IT_IS_READ_ONLY
+[build]   398 |     EIGEN_STATIC_ASSERT(!OtherDerived::IsPlainObjectBase, THIS_EXPRESSION_IS_NOT_A_LVALUE__IT_IS_READ_ONLY);
+[build]       |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[build] C:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0/Eigen/src/Core/util/StaticAssert.h:26:51: note: in definition of macro 'EIGEN_STATIC_ASSERT'
+[build]    26 | #define EIGEN_STATIC_ASSERT(X, MSG) static_assert(X, #MSG);
+[build]       |                                                   ^
+[build] C:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0/Eigen/src/Core/DenseBase.h:398:25: note: 'false' evaluates to false
+[build]   398 |     EIGEN_STATIC_ASSERT(!OtherDerived::IsPlainObjectBase, THIS_EXPRESSION_IS_NOT_A_LVALUE__IT_IS_READ_ONLY);
+[build]       |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[build] C:/Users/admin/Desktop/hplinalg/external/eigen-5.0.0/Eigen/src/Core/util/StaticAssert.h:26:51: note: in definition of macro 'EIGEN_STATIC_ASSERT'
+[build]    26 | #define EIGEN_STATIC_ASSERT(X, MSG) static_assert(X, #MSG);
+[build]       |                                                   ^
+[build] [2/4  50% :: 3.074] Building CXX object src/CMakeFiles/direct_method_core.dir/core/separate_substitution.cpp.obj
+[build] ninja: build stopped: subcommand failed.
+[proc] The command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" --build c:/Users/admin/Desktop/hplinalg/build --config Debug --target all -- exited with code: 1
+[driver] Build completed: 00:00:03.126
+[build] Build finished with exit code 1
