@@ -1,35 +1,35 @@
-[main] Building folder: c:/Users/admin/Desktop/hplinalg/build 
-[main] Configuring project: hplinalg 
-[proc] Executing command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE -DCMAKE_C_COMPILER:FILEPATH=C:\msys64\ucrt64\bin\gcc.exe -DCMAKE_CXX_COMPILER:FILEPATH=C:\msys64\ucrt64\bin\g++.exe --no-warn-unused-cli -S C:/Users/admin/Desktop/hplinalg -B c:/Users/admin/Desktop/hplinalg/build -G Ninja
-[cmake] Not searching for unused variables given on the command line.
-[cmake] -- Configuring done (0.2s)
-[cmake] CMake Error in CMakeLists.txt:
-[cmake]   IMPORTED_IMPLIB not set for imported target "NCTIETree::NCTIETree"
-[cmake]   configuration "Debug".
-[cmake] 
-[cmake] 
-[cmake] CMake Error in CMakeLists.txt:
-[cmake]   IMPORTED_IMPLIB not set for imported target "NCTIETree::NCTIETree"
-[cmake]   configuration "Debug".
-[cmake] 
-[cmake] 
-[cmake] CMake Error:
-[cmake]   Running
-[cmake] 
-[cmake]    'C:/msys64/ucrt64/bin/ninja.exe' '-C' 'C:/Users/admin/Desktop/hplinalg/build' '-t' 'recompact'
-[cmake] 
-[cmake]   failed with:
-[cmake] 
-[cmake]    ninja: error: build.ninja:35: loading 'CMakeFiles/rules.ninja': The system cannot find the file specified.
-[cmake] 
-[cmake]   
-[cmake] 
-[cmake]   include CMakeFiles/rules.ninja
-[cmake] 
-[cmake]                                 ^ near here
-[cmake] 
-[cmake] 
-[cmake] 
-[cmake] -- Generating done (0.1s)
-[cmake] CMake Generate step failed.  Build files cannot be regenerated correctly.
-[proc] The command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE -DCMAKE_C_COMPILER:FILEPATH=C:\msys64\ucrt64\bin\gcc.exe -DCMAKE_CXX_COMPILER:FILEPATH=C:\msys64\ucrt64\bin\g++.exe --no-warn-unused-cli -S C:/Users/admin/Desktop/hplinalg -B c:/Users/admin/Desktop/hplinalg/build -G Ninja exited with code: 1
+
+    /// @brief Heap entry for k-way merge
+    using HeapEntry = std::pair<index_t, index_t>; // (array index k, element index kIndex), value = arrays[k][kIndex]
+    struct HeapEntryCompare
+    {
+        const ArrayX<ArrayView<int_t>> &arrays;
+
+        HeapEntryCompare(const ArrayX<ArrayView<int_t>> &arrs) : arrays(arrs) {}
+
+        bool operator()(const HeapEntry &a, const HeapEntry &b) const
+        {
+            int_t valA = arrays[a.first][a.second];
+            int_t valB = arrays[b.first][b.second];
+            return valA > valB; // min-heap
+        }
+    };
+
+ArrayX<HeapEntry> heapBuffer;
+        heapBuffer.reserve(K);
+        std::priority_queue<HeapEntry, ArrayX<HeapEntry>, HeapEntryCompare> minHeap(HeapEntryCompare(arrays), std::move(heapBuffer));
+
+
+
+C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:213:85: error: no matching function for call to 'hplinalg::HeapEntryCompare::HeapEntryCompare(hplinalg::ArrayX<hplinalg::Span<const int> >&)'
+[build]   213 |         std::priority_queue<HeapEntry, ArrayX<HeapEntry>, HeapEntryCompare> minHeap(HeapEntryCompare(arrays), std::move(heapBuffer));
+[build]       |                                                                                     ^~~~~~~~~~~~~~~~~~~~~~~~
+[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:213:85: note: there are 3 candidates
+[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:170:9: note: candidate 1: 'hplinalg::HeapEntryCompare::HeapEntryCompare(hplinalg::ArrayX<hplinalg::Span<int> >&)'
+[build]   170 |         HeapEntryCompare(const ArrayX<ArrayView<int_t>> &arrs) : arrays(arrs) {}
+[build]       |         ^~~~~~~~~~~~~~~~
+[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:170:58: note: no known conversion for argument 1 from 'hplinalg::ArrayX<hplinalg::Span<const int> >' {aka 'const std::vector<hplinalg::Span<const int>, std::allocator<hplinalg::Span<const int> > >'} to 'hplinalg::ArrayX<hplinalg::Span<int> >&' {aka 'const std::vector<hplinalg::Span<int>, std::allocator<hplinalg::Span<int> > >&'}
+[build]   170 |         HeapEntryCompare(const ArrayX<ArrayView<int_t>> &arrs) : arrays(arrs) {}
+[build]       |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~
+[build] C:/Users/admin/Desktop/hplinalg/src/utils/merge_arrays.cpp:166:12: note: candidate 2: 'constexpr hplinalg::HeapEntryCompare::HeapEntryCompare(const hplinalg::HeapEntryCompare&)'
+[build]   166 |     struct HeapEntryCompare
