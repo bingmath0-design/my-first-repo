@@ -1,14 +1,30 @@
-[main] Building folder: c:/Users/admin/Desktop/hplinalg/build 
-[build] Starting build
-[proc] Executing command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" --build c:/Users/admin/Desktop/hplinalg/build --config Debug --target all --
-[build] [1/3  33% :: 3.440] Building CXX object src/CMakeFiles/direct_method_core.dir/core/block_factorization.cpp.obj
-[build] [2/3  66% :: 3.598] Linking CXX static library src\libdirect_method_core.a
-[build] [3/3 100% :: 3.759] Linking CXX executable tests\hplinalg_test.exe
-[build] FAILED: [code=1] tests/hplinalg_test.exe 
-[build] C:\WINDOWS\system32\cmd.exe /C "cd . && C:\msys64\ucrt64\bin\g++.exe -g  tests/CMakeFiles/hplinalg_test.dir/main.cpp.obj -o tests\hplinalg_test.exe -Wl,--out-implib,tests\libhplinalg_test.dll.a -Wl,--major-image-version,0,--minor-image-version,0  src/libdirect_method_core.a  src/libhplinalg_backend.a  -lmkl_rt  src/libhplinalg_utils.a  C:/Users/admin/Desktop/hplinalg/external/etree_gcc_win/lib/libNCTIETree.dll.a  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 && C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\admin\Desktop\hplinalg\build\tests && "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Users/admin/Desktop/hplinalg/external/mkl_import/mkl_rt.dll C:/Users/admin/Desktop/hplinalg/build/tests/mkl_rt.dll && cd /D C:\Users\admin\Desktop\hplinalg\build\tests && "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Users/admin/Desktop/hplinalg/external/etree_gcc_win/lib/libNCTIETree.dll.a C:/Users/admin/Desktop/hplinalg/build/tests && cd /D C:\Users\admin\Desktop\hplinalg\build\tests && "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Users/admin/Desktop/hplinalg/external/etree_gcc_win/bin C:/Users/admin/Desktop/hplinalg/build/tests""
-[build] C:/msys64/ucrt64/bin/../lib/gcc/x86_64-w64-mingw32/15.2.0/../../../../x86_64-w64-mingw32/bin/ld.exe: cannot find -lmkl_rt: No such file or directory
-[build] collect2.exe: error: ld returned 1 exit status
-[build] ninja: build stopped: subcommand failed.
-[proc] The command: "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE" --build c:/Users/admin/Desktop/hplinalg/build --config Debug --target all -- exited with code: 1
-[driver] Build completed: 00:00:03.834
-[build] Build finished with exit code 1
+add_executable(hplinalg_test main.cpp)
+target_link_libraries(hplinalg_test PRIVATE direct_method_core)
+
+#Windows + MKL
+if(USE_MKL AND WIN32)
+    add_custom_command(
+        TARGET hplinalg_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PROJECT_SOURCE_DIR}/external/mkl_import/mkl_rt.dll"
+            "$<TARGET_FILE_DIR:hplinalg_test>/mkl_rt.dll"
+    )
+endif(USE_MKL AND WIN32)
+
+if(WIN32)
+    # 1. copy main imported dll (libNCTIETree.dll) to the test executable directory
+    add_custom_command(
+        TARGET hplinalg_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:NCTIETree::NCTIETree>"
+            "$<TARGET_FILE_DIR:hplinalg_test>"
+    )
+
+    # 2. copy all dependent dlls from the same bin directory to the test executable directory
+     add_custom_command(
+        TARGET hplinalg_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${PROJECT_SOURCE_DIR}/external/etree_gcc_win/bin"
+            "$<TARGET_FILE_DIR:hplinalg_test>"
+    )
+endif(WIN32)
