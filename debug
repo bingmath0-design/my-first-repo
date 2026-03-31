@@ -1,6 +1,83 @@
-cblas_dgemmt(CblasColMajor, CblasUpper,
-                     CblasTrans, CblasNoTrans,
-                     n, k,
-                     alpha, A.data(), lda,
-                     B.data(), ldb, beta,
-                     C.data(), ldc);
+admin@LAPTOP-OPJN24QV UCRT64 ~
+$ pacman -S mingw-w64-ucrt-x86_64-openblas
+resolving dependencies...
+looking for conflicting packages...
+
+Packages (2) mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11
+             mingw-w64-ucrt-x86_64-openblas-0.3.31-1
+
+Total Download Size:    12.55 MiB
+Total Installed Size:  111.70 MiB
+
+:: Proceed with installation? [Y/n] y
+:: Retrieving packages...
+ mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst failed to download
+ mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst failed to download
+ Total (2/2)                      12.5 MiB   204 KiB/s 01:03 [###############################] 100%
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.ustc.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.ustc.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from repo.msys2.org : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from repo.msys2.org : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from ftp2.osuosl.org : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from ftp2.osuosl.org : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.yandex.ru : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.yandex.ru : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.accum.se : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.accum.se : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from ftp.nluug.nl : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from ftp.nluug.nl : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.internet.asn.au : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.internet.asn.au : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.selfnet.de : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.selfnet.de : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.dotsrc.org : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.dotsrc.org : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.bfsu.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.bfsu.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.tuna.tsinghua.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.tuna.tsinghua.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.ustc.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+warning: too many errors from mirrors.ustc.edu.cn, skipping for the remainder of this transaction
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.ustc.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.nju.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.nju.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.archlinux.tw : Connection timed out after 10014 milliseconds
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.archlinux.tw : Connection timed out after 10008 milliseconds
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from distrohub.kyiv.ua : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from distrohub.kyiv.ua : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.umd.edu : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from us.mirrors.cicku.me : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.umd.edu : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from us.mirrors.cicku.me : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from ca.mirrors.cicku.me : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from ca.mirrors.cicku.me : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.clarkson.edu : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.qlu.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.clarkson.edu : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.qlu.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from ftp.cc.uoc.gr : Connection timed out after 10013 milliseconds
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from ftp.cc.uoc.gr : Connection timed out after 10007 milliseconds
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.jmu.edu : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.jmu.edu : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.piconets.webwerks.in : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.piconets.webwerks.in : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from www2.futureware.at : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from www2.futureware.at : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.sjtug.sjtu.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.sjtug.sjtu.edu.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.bit.edu.cn : Connection timed out after 10014 milliseconds
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.bit.edu.cn : Connection timed out after 10003 milliseconds
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.aliyun.com : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.aliyun.com : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirror.iscas.ac.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirror.iscas.ac.cn : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from mirrors.cloud.tencent.com : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from mirrors.cloud.tencent.com : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from download.nus.edu.sg : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from download.nus.edu.sg : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-openblas-0.3.31-1-any.pkg.tar.zst' from repo.extreme-ix.org : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+error: failed retrieving file 'mingw-w64-ucrt-x86_64-gcc-libgfortran-15.2.0-11-any.pkg.tar.zst' from repo.extreme-ix.org : SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+warning: failed to retrieve some files
+error: failed to commit transaction (download library error)
+Errors occurred, no packages were upgraded.
+
