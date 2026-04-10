@@ -27,32 +27,27 @@ Preset CMake variables:
 -- Importing OpenBLAS from: /home/share/lib/openblas-0.3.30
 -- OpenBLAS include directory: /usr/include
 -- OpenBLAS library: /home/share/lib/openblas-0.3.30/lib64/libopenblas.so
-CMake Error at CMakeLists.txt:110 (include):
-  include could not find requested file:
+-- Importing NCTIE tree from /home/share/lib/NCTIEtree
+-- NCTIE tree include directory: /home/share/lib/NCTIEtree/include
+-- NCTIE tree library: /home/share/lib/NCTIEtree/lib/libNCTIEtree.so
+-- Configuring done
+CMake Error at src/backend/CMakeLists.txt:6 (add_library):
+  Cannot find source file:
 
-    ImportNCTIETree
-
-
-CMake Warning (dev) at src/core/CMakeLists.txt:35:
-  Syntax Warning in cmake code at column 43
-
-  Argument not separated from preceding token by whitespace.
-This warning is for project developers.  Use -Wno-dev to suppress it.
-
-CMake Error at src/core/CMakeLists.txt:34 (set_target_properties):
-  set_target_properties called with incorrect number of arguments.
+    blas_openblas.cpp
 
 
-CMake Warning (dev) at tests/CMakeLists.txt:19:
-  Syntax Warning in cmake code at column 45
-
-  Argument not separated from preceding token by whitespace.
-This warning is for project developers.  Use -Wno-dev to suppress it.
-
-CMake Error at tests/CMakeLists.txt:18 (set_target_properties):
-  set_target_properties called with incorrect number of arguments.
+CMake Error at src/utils/CMakeLists.txt:5 (add_library):
+  No SOURCES given to target: hplinalg_utils
 
 
--- Configuring incomplete, errors occurred!
-See also "/home/lihubing/hplinalg/build/CMakeFiles/CMakeOutput.log".
+CMake Error at src/backend/CMakeLists.txt:6 (add_library):
+  No SOURCES given to target: hplinalg_backend
+
+
+CMake Error at src/core/CMakeLists.txt:6 (add_library):
+  No SOURCES given to target: direct_method_core
+
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.
 [lihubing@gczxagenta4 hplinalg]$ 
