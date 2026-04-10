@@ -24,12 +24,33 @@ Preset CMake variables:
 -- Check for working CXX compiler: /usr/bin/g++ - skipped
 -- Detecting CXX compile features
 -- Detecting CXX compile features - done
-CMake Error at CMakeLists.txt:66 (if):
-  if given arguments:
+-- Importing OpenBLAS from: /home/share/lib/openblas-0.3.30
+-- OpenBLAS include directory: /usr/include
+-- OpenBLAS library: /home/share/lib/openblas-0.3.30/lib64/libopenblas.so
+CMake Error at CMakeLists.txt:110 (include):
+  include could not find requested file:
 
-    "not" "CMAKE_BUILD_TYPE"
+    ImportNCTIETree
 
-  Unknown arguments specified
+
+CMake Warning (dev) at src/core/CMakeLists.txt:35:
+  Syntax Warning in cmake code at column 43
+
+  Argument not separated from preceding token by whitespace.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Error at src/core/CMakeLists.txt:34 (set_target_properties):
+  set_target_properties called with incorrect number of arguments.
+
+
+CMake Warning (dev) at tests/CMakeLists.txt:19:
+  Syntax Warning in cmake code at column 45
+
+  Argument not separated from preceding token by whitespace.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Error at tests/CMakeLists.txt:18 (set_target_properties):
+  set_target_properties called with incorrect number of arguments.
 
 
 -- Configuring incomplete, errors occurred!
