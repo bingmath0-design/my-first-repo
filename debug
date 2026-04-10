@@ -1,6 +1,4 @@
-[lihubing@gczxagenta4 home]$ cd /home/lihubing/hplinalg/
-[lihubing@gczxagenta4 hplinalg]$ usr/bin/cmake --preset linux-debug
-bash: usr/bin/cmake: No such file or directory
+[lihubing@gczxagenta4 ~]$ cd /home/lihubing/hplinalg/
 [lihubing@gczxagenta4 hplinalg]$ cmake --preset linux-debug
 Preset CMake variables:
 
@@ -12,9 +10,9 @@ Preset CMake variables:
   HPLINALG_BLAS_BACKEND="OpenBLAS"
   NCTIETREE_ROOT="/home/share/lib/NCTIEtree"
   OPENBLAS_ROOT="/home/share/lib/openblas-0.3.30"
-  USE_NCTIETREE="ON"
+  USE_ETREE="ON"
 
-CMake Error: CMake was unable to find a build program corresponding to "Ninja".  CMAKE_MAKE_PROGRAM is not set.  You probably need to select a different build tool.
--- Configuring incomplete, errors occurred!
-See also "/home/lihubing/hplinalg/build/CMakeFiles/CMakeOutput.log".
+CMake Error: Error: generator : Unix Makefiles
+Does not match the generator used previously: Ninja
+Either remove the CMakeCache.txt file and CMakeFiles directory or choose a different binary directory.
 [lihubing@gczxagenta4 hplinalg]$ 
