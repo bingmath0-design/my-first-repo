@@ -1,36 +1,158 @@
-[lihubing@gczxagenta4 hplinalg]$ rm -rf build
-[lihubing@gczxagenta4 hplinalg]$ cmake --preset linux-debug
-Preset CMake variables:
+CMakePresets.json裏面寫了：
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 20,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "linux-debug",
+            "displayName": "Linux Debug",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "/usr/bin/gcc",
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
+                "OPENBLAS_ROOT": "/home/share/lib/openblas-0.3.30",
+                "NCTIETREE_ROOT": "/home/share/lib/NCTIEtree",
+                "EIGEN_ROOT": "${sourceDir}/external/eigen-5.0.0",
+                "HPLINALG_BLAS_BACKEND": "OpenBLAS",
+                "USE_ETREE": "ON",
+                "BUILD_SHARED_LIBS": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug"
+        }
+    ]
+}
 
-  BUILD_SHARED_LIBS="OFF"
-  CMAKE_BUILD_TYPE="Debug"
-  CMAKE_CXX_COMPILER="/usr/bin/g++"
-  CMAKE_C_COMPILER="/usr/bin/gcc"
-  EIGEN_ROOT="/home/lihubing/hplinalg/external/eigen-5.0.0"
-  HPLINALG_BLAS_BACKEND="OpenBLAS"
-  NCTIETREE_ROOT="/home/share/lib/NCTIEtree"
-  OPENBLAS_ROOT="/home/share/lib/openblas-0.3.30"
-  USE_ETREE="ON"
+CMakeLists.txt裏也寫了路徑，不是重複了嗎？
+cmake_minimum_required(VERSION 3.20)
 
--- The C compiler identification is GNU 10.3.1
--- The CXX compiler identification is GNU 10.3.1
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/gcc - skipped
--- Detecting C compile features
--- Detecting C compile features - done
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/g++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- Importing OpenBLAS from: /home/share/lib/openblas-0.3.30
--- OpenBLAS include directory: /home/share/lib/openblas-0.3.30/include/openblas
--- OpenBLAS library: /home/share/lib/openblas-0.3.30/lib64/libopenblas.so
--- Importing NCTIE tree from /home/share/lib/NCTIEtree
--- NCTIE tree include directory: /home/share/lib/NCTIEtree/include
--- NCTIE tree library: /home/share/lib/NCTIEtree/lib/libNCTIEtree.so
--- Configuring done
--- Generating done
--- Build files have been written to: /home/lihubing/hplinalg/build
-[lihubing@gczxagenta4 hplinalg]$ 
+project(hplinalg
+    VERSION 0.1.0 
+    LANGUAGES C CXX
+)
+
+#------------------------------------
+# Global options 
+#------------------------------------
+option(BUILD_SHARED_LIBS 
+    "Build shared libraries" 
+    OFF
+) # Default to OFF for better performance and easier distribution (no need to worry about DLLs on Windows)
+option(USE_ETREE 
+    "Enable NCTIETree support" 
+    ON
+) # Default to ON since it's a core dependency for sparse solvers and we provide prebuilt binaries for all platforms
+
+set(HPLINALG_BLAS_BACKEND 
+    "OpenBLAS" 
+    CACHE STRING 
+    "BLAS backend"
+)
+set_property(CACHE 
+    HPLINALG_BLAS_BACKEND 
+    PROPERTY 
+    STRINGS 
+    OpenBLAS 
+    MKL
+    Accelerate
+    None
+) # Default to OpenBLAS for best performance, but allow users to disable BLAS support if they want (e.g. for embedded use cases) 
+
+#Third-party roots
+set(OPENBLAS_ROOT 
+    "home/share/lib/openblas-0.3.30" 
+    CACHE PATH 
+    "OpenBLAS root"
+)
+set(
+    NCTITREE_ROOT 
+    "home/share/lib/NCTIEtree"
+    CACHE PATH
+    "NCTIEtree root"
+)
+set(
+    EIGEN_ROOT
+    "${CMAKE_SOURCE_DIR}/external/eigen-5.0.0"
+    CACHE PATH
+    "Eigen root"
+)
+
+
+#------------------------------------
+# Build settings
+#------------------------------------ 
+set(CMAKE_CXX_STANDARD 
+    17
+)
+set(CMAKE_CXX_STANDARD_REQUIRED 
+    ON
+)
+set(CMAKE_CXX_EXTENSIONS 
+    OFF
+)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE 
+        debug 
+        CACHE STRING 
+        "build type (Debug, Release, RelWithDebInfo, MinSizeRel)" 
+        FORCE
+    )
+endif()
+
+#compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+#------------------------------------ 
+# Include helper cmake modules
+#------------------------------------ 
+list(APPEND CMAKE_MODULE_PATH 
+    "${CMAKE_SOURCE_DIR}/cmake"
+)
+
+
+#------------------------------------ 
+# Third-party interface targets
+#------------------------------------ 
+add_library(
+    eigen_headers 
+    INTERFACE
+)
+target_include_directories(
+    eigen_headers 
+    INTERFACE 
+        ${EIGEN_ROOT}
+)
+
+#import OpenBLAS backend targets
+if(HPLINALG_BLAS_BACKEND STREQUAL "OpenBLAS")
+    include(ImportOpenBLAS)
+
+elseif(HPLINALG_BLAS_BACKEND STREQUAL "None")
+    message(STATUS "BLAS support disabled")
+
+else()
+    message(FATAL_ERROR "Unsupported BLAS backend: ${HPLINALG_BLAS_BACKEND}")
+    
+endif()
+
+#Import NCTIEtree targets if enabled (required for sparse solvers)
+if(USE_ETREE)
+    include(ImportNCTIEtree)
+endif()
+
+#------------------------------------ 
+# Add subdirectories    
+#------------------------------------
+add_subdirectory(src)
+add_subdirectory(tests)
