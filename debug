@@ -1,40 +1,43 @@
-file(
-    GLOB BACKEND_SOURCES
-    backend/*.cpp
-)
+[lihubing@gczxagenta4 hplinalg]$ rm -rf build
+[lihubing@gczxagenta4 hplinalg]$ cmake --preset linux-debug
+Preset CMake variables:
 
-add_library(
-    hplinalg_backend
-    STATIC
-        ${BACKEND_SOURCES}
-)
+  BUILD_SHARED_LIBS="OFF"
+  CMAKE_BUILD_TYPE="Debug"
+  CMAKE_CXX_COMPILER="/usr/bin/g++"
+  CMAKE_C_COMPILER="/usr/bin/gcc"
+  EIGEN_ROOT="/home/lihubing/hplinalg/external/eigen-5.0.0"
+  HPLINALG_BLAS_BACKEND="OpenBLAS"
+  NCTIETREE_ROOT="/home/share/lib/NCTIEtree"
+  OPENBLAS_ROOT="/home/share/lib/openblas-0.3.30"
+  USE_ETREE="ON"
 
-target_include_directories(
-    hplinalg_backend
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
-    PUBLIC
-        ${CMAKE_SOURCE_DIR}/include
-)
+-- The C compiler identification is GNU 10.3.1
+-- The CXX compiler identification is GNU 10.3.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/gcc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Importing OpenBLAS from: /home/share/lib/openblas-0.3.30
+-- OpenBLAS include directory: /usr/include
+-- OpenBLAS library: /home/share/lib/openblas-0.3.30/lib64/libopenblas.so
+-- Importing NCTIE tree from /home/share/lib/NCTIEtree
+-- NCTIE tree include directory: /home/share/lib/NCTIEtree/include
+-- NCTIE tree library: /home/share/lib/NCTIEtree/lib/libNCTIEtree.so
+-- Configuring done
+CMake Error at src/utils/CMakeLists.txt:5 (add_library):
+  No SOURCES given to target: hplinalg_utils
 
-target_link_libraries(
-    hplinalg_backend
-    PRIVATE
-        hplinalg_utils 
-        OpenBLAS::OpenBLAS
-    PUBLIC
-        hplinalg_data 
-)
 
-#Linux runtime path for shared libraries
-set_target_properties(hplinalg_backend PROPERTIES
-    BUILD_RPATH "${OPENBLAS_ROOT}/lib64"
-)
+CMake Error at src/core/CMakeLists.txt:6 (add_library):
+  No SOURCES given to target: direct_method_core
 
-# Set the appropriate source files based on the selected BLAS backend
-if(HPLINALG_BLAS_BACKEND STREQUAL "OpenBLAS")
-    target_sources(hplinalg_backend PRIVATE
-        blas_openblas.cpp
-        lapack_openblas.cpp
-    )
-endif(HPLINALG_BLAS_BACKEND STREQUAL "OpenBLAS")
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.
+[lihubing@gczxagenta4 hplinalg]$ 
