@@ -1,158 +1,23 @@
-CMakePresets.json裏面寫了：
-{
-    "version": 3,
-    "cmakeMinimumRequired": {
-        "major": 3,
-        "minor": 20,
-        "patch": 0
-    },
-    "configurePresets": [
-        {
-            "name": "linux-debug",
-            "displayName": "Linux Debug",
-            "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_C_COMPILER": "/usr/bin/gcc",
-                "CMAKE_CXX_COMPILER": "/usr/bin/g++",
-                "OPENBLAS_ROOT": "/home/share/lib/openblas-0.3.30",
-                "NCTIETREE_ROOT": "/home/share/lib/NCTIEtree",
-                "EIGEN_ROOT": "${sourceDir}/external/eigen-5.0.0",
-                "HPLINALG_BLAS_BACKEND": "OpenBLAS",
-                "USE_ETREE": "ON",
-                "BUILD_SHARED_LIBS": "OFF"
-            }
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "linux-debug",
-            "configurePreset": "linux-debug"
-        }
-    ]
-}
-
-CMakeLists.txt裏也寫了路徑，不是重複了嗎？
-cmake_minimum_required(VERSION 3.20)
-
-project(hplinalg
-    VERSION 0.1.0 
-    LANGUAGES C CXX
-)
-
-#------------------------------------
-# Global options 
-#------------------------------------
-option(BUILD_SHARED_LIBS 
-    "Build shared libraries" 
-    OFF
-) # Default to OFF for better performance and easier distribution (no need to worry about DLLs on Windows)
-option(USE_ETREE 
-    "Enable NCTIETree support" 
-    ON
-) # Default to ON since it's a core dependency for sparse solvers and we provide prebuilt binaries for all platforms
-
-set(HPLINALG_BLAS_BACKEND 
-    "OpenBLAS" 
-    CACHE STRING 
-    "BLAS backend"
-)
-set_property(CACHE 
-    HPLINALG_BLAS_BACKEND 
-    PROPERTY 
-    STRINGS 
-    OpenBLAS 
-    MKL
-    Accelerate
-    None
-) # Default to OpenBLAS for best performance, but allow users to disable BLAS support if they want (e.g. for embedded use cases) 
-
-#Third-party roots
-set(OPENBLAS_ROOT 
-    "home/share/lib/openblas-0.3.30" 
-    CACHE PATH 
-    "OpenBLAS root"
-)
-set(
-    NCTITREE_ROOT 
-    "home/share/lib/NCTIEtree"
-    CACHE PATH
-    "NCTIEtree root"
-)
-set(
-    EIGEN_ROOT
-    "${CMAKE_SOURCE_DIR}/external/eigen-5.0.0"
-    CACHE PATH
-    "Eigen root"
-)
-
-
-#------------------------------------
-# Build settings
-#------------------------------------ 
-set(CMAKE_CXX_STANDARD 
-    17
-)
-set(CMAKE_CXX_STANDARD_REQUIRED 
-    ON
-)
-set(CMAKE_CXX_EXTENSIONS 
-    OFF
-)
-
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE 
-        debug 
-        CACHE STRING 
-        "build type (Debug, Release, RelWithDebInfo, MinSizeRel)" 
-        FORCE
-    )
-endif()
-
-#compile_commands.json
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-#------------------------------------ 
-# Include helper cmake modules
-#------------------------------------ 
-list(APPEND CMAKE_MODULE_PATH 
-    "${CMAKE_SOURCE_DIR}/cmake"
-)
-
-
-#------------------------------------ 
-# Third-party interface targets
-#------------------------------------ 
-add_library(
-    eigen_headers 
-    INTERFACE
-)
-target_include_directories(
-    eigen_headers 
-    INTERFACE 
-        ${EIGEN_ROOT}
-)
-
-#import OpenBLAS backend targets
-if(HPLINALG_BLAS_BACKEND STREQUAL "OpenBLAS")
-    include(ImportOpenBLAS)
-
-elseif(HPLINALG_BLAS_BACKEND STREQUAL "None")
-    message(STATUS "BLAS support disabled")
-
-else()
-    message(FATAL_ERROR "Unsupported BLAS backend: ${HPLINALG_BLAS_BACKEND}")
-    
-endif()
-
-#Import NCTIEtree targets if enabled (required for sparse solvers)
-if(USE_ETREE)
-    include(ImportNCTIEtree)
-endif()
-
-#------------------------------------ 
-# Add subdirectories    
-#------------------------------------
-add_subdirectory(src)
-add_subdirectory(tests)
+[lihubing@gczxagenta4 hplinalg]$ cmake --build --preset linux-debug
+[  7%] Building CXX object src/utils/CMakeFiles/hplinalg_utils.dir/merge_arrays.cpp.o
+[ 15%] Building CXX object src/utils/CMakeFiles/hplinalg_utils.dir/timer.cpp.o
+[ 23%] Linking CXX static library libhplinalg_utils.a
+[ 23%] Built target hplinalg_utils
+[ 30%] Building CXX object src/backend/CMakeFiles/hplinalg_backend.dir/blas_interface.cpp.o
+[ 38%] Building CXX object src/backend/CMakeFiles/hplinalg_backend.dir/lapack_interface.cpp.o
+[ 46%] Linking CXX static library libhplinalg_backend.a
+[ 46%] Built target hplinalg_backend
+[ 53%] Building CXX object src/core/CMakeFiles/direct_method_core.dir/block_factorization.cpp.o
+[ 61%] Building CXX object src/core/CMakeFiles/direct_method_core.dir/dm_solver.cpp.o
+[ 69%] Building CXX object src/core/CMakeFiles/direct_method_core.dir/fill_reduction.cpp.o
+[ 76%] Building CXX object src/core/CMakeFiles/direct_method_core.dir/separate_substitution.cpp.o
+[ 84%] Linking CXX static library libdirect_method_core.a
+[ 84%] Built target direct_method_core
+[ 92%] Building CXX object tests/CMakeFiles/hplinalg_test.dir/main.cpp.o
+/home/lihubing/hplinalg/tests/main.cpp:7:10: fatal error: Eigen/Dense: No such file or directory
+    7 | #include <Eigen/Dense>
+      |          ^~~~~~~~~~~~~
+compilation terminated.
+gmake[2]: *** [tests/CMakeFiles/hplinalg_test.dir/build.make:76: tests/CMakeFiles/hplinalg_test.dir/main.cpp.o] Error 1
+gmake[1]: *** [CMakeFiles/Makefile2:266: tests/CMakeFiles/hplinalg_test.dir/all] Error 2
+gmake: *** [Makefile:91: all] Error 2
