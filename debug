@@ -1,23 +1,5 @@
-[lihubing@gczxagenta4 hplinalg]$ cmake --build --preset linux-debug
-[  7%] Building CXX object src/utils/CMakeFiles/hplinalg_utils.dir/merge_arrays.cpp.o
-[ 15%] Building CXX object src/utils/CMakeFiles/hplinalg_utils.dir/timer.cpp.o
-[ 23%] Linking CXX static library libhplinalg_utils.a
-[ 23%] Built target hplinalg_utils
-[ 30%] Building CXX object src/backend/CMakeFiles/hplinalg_backend.dir/blas_interface.cpp.o
-[ 38%] Building CXX object src/backend/CMakeFiles/hplinalg_backend.dir/lapack_interface.cpp.o
-[ 46%] Linking CXX static library libhplinalg_backend.a
-[ 46%] Built target hplinalg_backend
-[ 53%] Building CXX object src/core/CMakeFiles/direct_method_core.dir/block_factorization.cpp.o
-[ 61%] Building CXX object src/core/CMakeFiles/direct_method_core.dir/dm_solver.cpp.o
-[ 69%] Building CXX object src/core/CMakeFiles/direct_method_core.dir/fill_reduction.cpp.o
-[ 76%] Building CXX object src/core/CMakeFiles/direct_method_core.dir/separate_substitution.cpp.o
-[ 84%] Linking CXX static library libdirect_method_core.a
-[ 84%] Built target direct_method_core
-[ 92%] Building CXX object tests/CMakeFiles/hplinalg_test.dir/main.cpp.o
-/home/lihubing/hplinalg/tests/main.cpp:7:10: fatal error: Eigen/Dense: No such file or directory
-    7 | #include <Eigen/Dense>
-      |          ^~~~~~~~~~~~~
-compilation terminated.
-gmake[2]: *** [tests/CMakeFiles/hplinalg_test.dir/build.make:76: tests/CMakeFiles/hplinalg_test.dir/main.cpp.o] Error 1
-gmake[1]: *** [CMakeFiles/Makefile2:266: tests/CMakeFiles/hplinalg_test.dir/all] Error 2
-gmake: *** [Makefile:91: all] Error 2
+In file included from /home/lihubing/hplinalg/src/core/block_factorization.cpp:2:
+[build] /home/lihubing/hplinalg/src/core/block_factorization_kernel.h: In static member function ‘static void hplinalg::detail::FactorizationKernel<Traits>::factorize_leaf_node(hplinalg::detail::FactorizationKernel<Traits>::block_type&, hplinalg::detail::FactorizationKernel<Traits>::block_type&, hplinalg::detail::FactorizationKernel<Traits>::block_type&, hplinalg::detail::FactorizationKernel<Traits>::index_array_type&, hplinalg::detail::FactorizationKernel<Traits>::index_type, hplinalg::detail::FactorizationKernel<Traits>::index_type, const PtrArray&, const IndArray&, const ValIndexArray&, hplinalg::detail::FactorizationKernel<Traits>::value_ptr_type)’:
+[build] /home/lihubing/hplinalg/src/core/block_factorization_kernel.h:280:71: error: expected primary-expression before ‘)’ token
+[build]   280 |                 U_ij_eigen = A_ii_eigen.selfadjointView<Eigen::Upper>().ldlt().solve(U_ij_eigen);
+[build]       |                                                                       ^
